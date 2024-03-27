@@ -1,4 +1,4 @@
-package org.example;
+package org.coen366;
 
 public enum Status {
     //2.1 Registration and de Registration
@@ -29,6 +29,5 @@ public enum Status {
     UPDATE_CONTACT,
     UPDATE_CONFIRMED,
     UPDATE_DENIED
-
 
 }
