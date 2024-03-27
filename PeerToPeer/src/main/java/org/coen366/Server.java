@@ -1,4 +1,4 @@
-package org.example;
+package org.coen366;
 
 import java.io.*;
 import java.net.*;
@@ -39,6 +39,7 @@ public class Server {
             // Listen for incoming UDP packets
             while(true) {
                 // Receive incoming UDP packet
+                System.out.println("Listening for client connections on server port: "+SERVER_PORT);
                 DatagramPacket request = new DatagramPacket(buffer, buffer.length);
                 socket.receive(request);
 

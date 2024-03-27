@@ -1,4 +1,4 @@
-package org.example;
+package org.coen366;
 
 
 import java.net.*;
