@@ -66,7 +66,7 @@ class ClientHandler implements Runnable {
                 // Register the client
                 out.println("registered");
                 Server.incrementRegisteredClients(); // Increment the registeredClients variable
-                String client = in.readLine(); // Read client message (e.g., "hello")
+                String client = in.readLine(); // Read client message (e.g., "client info stuff")
                 Server.getClients().add(client);
                 if (Server.getRegisteredClients() == 4) {
                     sendToArchiveServer(Server.getClients().toString());
