@@ -7,7 +7,7 @@ import java.util.List;
 
 public class Server {
 
-    private static final int SERVER_PORT = 12345;
+    private static final int SERVER_PORT = 3000;
     private static int registeredClients = 0; // Initialize the variable
     private static List<String> clients = new ArrayList<>();
 
@@ -44,14 +44,13 @@ public class Server {
                 socket.receive(request);
 
                 // Process the packet
-                String message = new String(request.getData(), 0, request.getLength());
-                System.out.println("Client: " + message);
+                String receivedMessage = new String(request.getData(), 0, request.getLength());
+                String messageToSend = handleMessage(receivedMessage, request);
 
                 // Send response to client
                 InetAddress clientAddress = request.getAddress();
-                System.out.println("Client address: "+clientAddress);
                 int clientPort = request.getPort();
-                byte[] sendData = message.getBytes();
+                byte[] sendData = messageToSend.getBytes();
                 DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
                 socket.send(response);
             }
@@ -64,6 +63,37 @@ public class Server {
             }
         }
     }
+
+    private static String handleMessage(String message, DatagramPacket request) throws IOException {
+
+        String msgToSend;
+        if(message.startsWith(Status.REGISTER.name())) {
+
+            String[] info = message.split(" ");
+            String clientName = info[1];
+            String clientAddress = info[2];
+            String clientPort = info[3];
+
+            // Check if client is already registered
+            if (clients.contains(clientName)) {
+                msgToSend = Status.REGISTER_DENIED.name() + " " + clientName + " already registered";
+            } else {
+                clients.add(clientName);
+                incrementRegisteredClients();
+                msgToSend = Status.REGISTERED.name() + " SomeRQ#";
+                System.out.println("Client registered: " + clientName + " " + clientAddress + " " + clientPort);
+            }
+
+        } else {
+            msgToSend = "Unknown message received: " + message;
+            System.out.println(msgToSend);
+        }
+
+        return msgToSend;
+
+    }
+
+
 
     // Getter method for registeredClients (optional)
     public static int getRegisteredClients() {
