@@ -11,7 +11,11 @@ public class Server {
     private static int registeredClients = 0; // Initialize the variable
     private static List<String> clients = new ArrayList<>();
 
+
+
     public static void main(String[] args) {
+
+        // ask user for socket number
 
         // Start the server
         listenForUDP();
@@ -147,6 +151,8 @@ class TCPClientHandler implements Runnable {
             e.printStackTrace();
         }
     }
+
+
 
 }
 

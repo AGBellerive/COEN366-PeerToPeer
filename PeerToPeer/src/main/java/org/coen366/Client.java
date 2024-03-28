@@ -9,7 +9,12 @@ public class Client {
 
     private static final int SERVER_PORT = 3000;
 
+    private static final String SERVER_IP_ADDRESS = "localhost";
+
     private static final int CLIENT_PORT = 8080; // UDP port number
+
+    private static int rqNum = 1;
+
     private final String clientName;
     private final DatagramSocket socket;
 
@@ -17,6 +22,13 @@ public class Client {
 
 
     public Client(String clientName, DatagramSocket datagramSocket, InetAddress clientAddress) {
+
+        // ask user for (udp socket number and ip address) of server
+        // ask for clientNAme
+        // ask for all info (no hardcoded)
+
+        getUserInput();
+
         this.clientName = clientName;
         this.socket = datagramSocket;
         this.clientAddress = clientAddress;
@@ -148,8 +160,19 @@ public class Client {
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
-//        System.out.print("Enter client name: ");
         String message = scanner.nextLine();
         return message;
+    }
+
+    private void incrementRQNum() {
+        rqNum++;
+    }
+
+    public static int getRqNum() {
+        return rqNum;
+    }
+
+    public static void setRqNum(int rqNum) {
+        Client.rqNum = rqNum;
     }
 }
