@@ -49,6 +49,7 @@ public class Server {
 
                 // Send response to client
                 InetAddress clientAddress = request.getAddress();
+                System.out.println("Client address: "+clientAddress);
                 int clientPort = request.getPort();
                 byte[] sendData = message.getBytes();
                 DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
