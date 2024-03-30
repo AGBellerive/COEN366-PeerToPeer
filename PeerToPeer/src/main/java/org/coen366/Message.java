@@ -24,8 +24,10 @@ public class Message implements Serializable {
     private Status action;
     private int rqNumber;
     //Should the request number be associated to the client or the message they are sending
-    private Client clientInfo;
+    //private Client clientInfo;
     private String reason;
+
+    private ClientInfo clientInfo;
 
     /**
      * For a new user to register, they must send a message
@@ -33,12 +35,23 @@ public class Message implements Serializable {
      * REGISTER RQ# Name IP Address UDP socket#
      * @param action will be the enum signifying the action that will be taken
      * @param rqNumber is the message id
-     * @param client is the users data like name, socket, ipaddress
+//     * @param client is the users data like name, socket, ipaddress
      */
-    public Message(Status action, int rqNumber, Client client) {
+    public Message(Status action, int rqNumber,ClientInfo clientInfo) {
         this.action = action;
         this.rqNumber = rqNumber;
-        this.clientInfo = client;
+        this.clientInfo = clientInfo;
+    }
+
+    public Message(Status action,int rqNumber, String reason){
+        this.action = action;
+        this.rqNumber = rqNumber;
+        this.reason = reason;
+    }
+
+    public Message(Status action,int rqNumber){
+        this.action = action;
+        this.rqNumber = rqNumber;
     }
 
     public Status getAction() {
@@ -65,11 +78,20 @@ public class Message implements Serializable {
         this.reason = reason;
     }
 
-    public Client getClientInfo() {
+    public ClientInfo getClientInfo() {
         return clientInfo;
     }
 
-    public void setClientInfo(Client clientInfo) {
-        this.clientInfo = clientInfo;
+    public void incrementRqNumber(){
+        this.rqNumber++;
+    }
+    @Override
+    public String toString() {
+        return "Message{" +
+                "action=" + action +
+                ", rqNumber=" + rqNumber +
+                ", clientInfo=" + clientInfo +
+                ", reason='" + reason + '\'' +
+                '}';
     }
 }
