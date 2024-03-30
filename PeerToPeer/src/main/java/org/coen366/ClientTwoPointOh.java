@@ -1,26 +1,28 @@
 package org.coen366;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.InetAddress;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
 import java.util.Scanner;
 
 import static java.lang.System.exit;
 
 public class ClientTwoPointOh {
-    private static Socket socket;
+    private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
+
+    private static int serverPort;
 
     public static void main(String[] args) {
         System.out.println("Enter the port you wish to connect to (Starting at 3000): ");
-        int enteredPort = Integer.parseInt(getUserInput());
+        int enteredClientPort = Integer.parseInt(getUserInput());
+
+        System.out.println("Enter the server port you wish to connect to (Starting at 3000): ");
+        serverPort = Integer.parseInt(getUserInput());
 
         try {
             //This connects the user to the specified port ngl idk if it should work like this
-            socket = new Socket("localhost",enteredPort);
-            socket.setSoTimeout(10000);
+            clientSocket = new DatagramSocket(serverPort);
+            clientSocket.setSoTimeout(10000);
 
             while (true) {
                 printOptions();
@@ -42,13 +44,8 @@ public class ClientTwoPointOh {
             throw new RuntimeException(e);
         }
         finally {
-            if(socket != null){
-                try {
-                    socket.close();
-                }
-                catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            if(clientSocket != null){
+                clientSocket.close();
             }
         }
     }
@@ -67,11 +64,11 @@ public class ClientTwoPointOh {
             String input = getUserInput();
             switch(input) {
                 case "1":
-                    storedClient = registerWithServerTwoPointOh(ClientTwoPointOh.socket);
+                    storedClient = registerWithServerTwoPointOh(ClientTwoPointOh.clientSocket);
                     break;
                 case "2":
                     if(storedClient != null){
-                        deregisterWithServer(ClientTwoPointOh.socket);
+//                        deregisterWithServer(ClientTwoPointOh.clientSocket);
                         return;
                     }
                     else{
@@ -94,7 +91,7 @@ public class ClientTwoPointOh {
      * @throws IOException
      * @throws ClassNotFoundException
      */
-    private static ClientInfo registerWithServerTwoPointOh(Socket socket) throws IOException, ClassNotFoundException {
+    private static ClientInfo registerWithServerTwoPointOh(DatagramSocket socket) throws IOException, ClassNotFoundException {
         System.out.println("Enter your name");
         String name = getUserInput();
 
@@ -109,16 +106,64 @@ public class ClientTwoPointOh {
         return clientInfo;
     }
 
-    private static Message getMessage(Socket socket, ClientInfo clientInfo) throws IOException, ClassNotFoundException {
+    private static Message getMessage(DatagramSocket socket, ClientInfo clientInfo) throws IOException, ClassNotFoundException {
         Message registerMessage = new Message(Status.REGISTER, clientInfo.getRqNum(), clientInfo);
 
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+//        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+//        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
         //Sends out the register message to the server
-        out.writeObject(registerMessage);
+//        out.writeObject(registerMessage);
+
+        byte[] sendData = registerMessage.toString().getBytes();
+        InetAddress serverAddress = InetAddress.getByName("localhost");
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, serverPort);
+        socket.send(sendPacket);
 
         //This waits for the server to respond back with the confirmation
-        return (Message) in.readObject();
+//        return (Message) in.readObject();
+
+
+        try
+        {      InetAddress address = InetAddress.getByName("localhost");
+            ByteArrayOutputStream byteStream = new
+                    ByteArrayOutputStream(5000);
+            ObjectOutputStream os = new ObjectOutputStream(new
+                    BufferedOutputStream(byteStream));
+            os.flush();
+            os.writeObject(registerMessage);
+            os.flush();
+            //retrieves byte array
+            byte[] sendBuf = byteStream.toByteArray();
+            DatagramPacket packet = new DatagramPacket(
+                    sendBuf, sendBuf.length, serverAddress, serverPort);
+            int byteCount = packet.getLength();
+            clientSocket.send(packet);
+            os.close();
+
+
+            // receive response
+            byte[] recvBuf = new byte[5000];
+            DatagramPacket receivedPacket = new DatagramPacket(recvBuf,
+                    recvBuf.length);
+            clientSocket.receive(receivedPacket);
+            int byteCounts = receivedPacket.getLength();
+            ByteArrayInputStream receiveByteStream = new
+                    ByteArrayInputStream(recvBuf);
+            ObjectInputStream is = new
+                    ObjectInputStream(new BufferedInputStream(receiveByteStream));
+            Message receivedMessage = (Message)is.readObject();
+            is.close();
+            System.out.println(receivedMessage);
+            return receivedMessage;
+
+        }
+        catch (UnknownHostException e)
+        {
+            System.err.println("Exception:  " + e);
+            e.printStackTrace();    }
+        catch (IOException e)    { e.printStackTrace();
+        }
+return null;
     }
 
     private static void deregisterWithServer(Socket socket) throws IOException, ClassNotFoundException {
