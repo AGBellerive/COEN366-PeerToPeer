@@ -10,21 +10,24 @@ public class ClientTwoPointOh {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private static int serverPort;
-
     private static int CLIENT_PORT = 8080;
     private static int SERVER_PORT = 3000;
 
     public static void main(String[] args) {
+        System.out.println("Enter the server port you wish to connect to:");
+        SERVER_PORT = Integer.parseInt(getUserInput());
+
         System.out.println("Enter the port you wish to connect to: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
 
         byte[] buffer = new byte[5000];
         try {
+            //Connects to the port specified by the user
             clientSocket = new DatagramSocket(CLIENT_PORT);
             clientSocket.setSoTimeout(10000); // 10 second timeout
             InetAddress clientAddress = InetAddress.getLocalHost();
 
+            //Will send this message to the server to display
             String connectionMessage = "I am client " + clientAddress.getHostAddress() + " connecting on the port "+ CLIENT_PORT ;
 
             //Prepares the message to be sent in a byte array

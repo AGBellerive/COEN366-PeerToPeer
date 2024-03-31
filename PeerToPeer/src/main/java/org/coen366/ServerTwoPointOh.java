@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 import static java.lang.System.exit;
 
@@ -18,6 +19,9 @@ public class ServerTwoPointOh {
     }
 
     public static void listenForUDP(){
+        System.out.println("Enter the server port you wish to start to:");
+        SERVER_PORT = Integer.parseInt(getUserInput());
+
         DatagramSocket socket = null;
         try {
             socket = new DatagramSocket(SERVER_PORT);
@@ -53,6 +57,15 @@ public class ServerTwoPointOh {
                 socket.close();
             }
         }
+    }
+
+    /**
+     * @author Sunil
+     * @return The users input
+     */
+    private static String getUserInput() {
+        Scanner scanner = new Scanner(System.in);
+        return scanner.nextLine();
     }
 
     private static Message receiveMessageFromClient(DatagramSocket socket) throws IOException, ClassNotFoundException {
@@ -126,6 +139,13 @@ public class ServerTwoPointOh {
         }
         sendMessageToClient(incoming, socket, outgoingMessage);
     }
+
+    /**
+     * This method handles it when the user wants to deregister
+     * @param incoming the user that is trying to leave
+     * @param socket the socket so that we can close it
+     * @throws IOException
+     */
     private static void handleDeregistration(Message incoming,DatagramSocket socket) throws IOException {
         ClientInfo deregisteringClient = incoming.getClientInfo();
         for (int i =0; i < clients.size();i++) {
@@ -181,11 +201,4 @@ public class ServerTwoPointOh {
         return outgoing;
     }
 
-    /**
-     * This method handles it when the user wants to deregister
-     * @param incoming the user that is trying to leave
-     * @param out the output stream to tell the user that they checked out
-     * @param clientSocket the socket so that we can close it
-     * @throws IOException
-     */
 }
