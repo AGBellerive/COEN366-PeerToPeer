@@ -1,10 +1,7 @@
 package org.coen366;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,75 +17,133 @@ public class ServerTwoPointOh {
         listenForUDP();
     }
 
-    public static void listenForUDP() {
-        ServerSocket serverSocket=null;
+    public static void listenForUDP(){
+        DatagramSocket socket = null;
         try {
+            socket = new DatagramSocket(SERVER_PORT);
+            byte[] buffer = new byte[5000];
+
+            System.out.println("Listening for client connections on server port: "+SERVER_PORT);
+
+            //Receives initial connection message
+            DatagramPacket request = new DatagramPacket(buffer, buffer.length);
+            socket.receive(request);
+            String connectionMessage = new String(request.getData(), 0, request.getLength());
+            System.out.println(connectionMessage);
+
+            // Send response to client
+            String messageToSend = "Connection successful. Proceed with registration";
+            InetAddress clientAddress = request.getAddress();
+            int clientPort = request.getPort();
+            byte[] sendData = messageToSend.getBytes();
+            DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
+            socket.send(response);
+
+            // Listen for incoming UDP packets
             while(true) {
-                // Listen for incoming UDP packets
-                System.out.println("Listening for client connections on server port: "+SERVER_PORT);
-                //This creates a new connection at the specified server port
-                serverSocket = new ServerSocket(SERVER_PORT);
                 // Receive incoming UDP packet
-                Socket clientSocket = serverSocket.accept();
+                request = new DatagramPacket(buffer, buffer.length);
+                socket.receive(request);
 
-                System.out.println("Connection from the client "+clientSocket.getInetAddress().getHostAddress());
-                SERVER_PORT++; // so if another client tries to connect, it will not crash the server
+                //receives the data and casts it to a Message object
+                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
+                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+                Message receivedMessage = (Message)objectInputStream.readObject();
+                handleMessage(receivedMessage,socket);
 
-                handleMessage(clientSocket);
+//                // Process the packet
+//
+//                // Send response to client
+//                InetAddress clientAddress = request.getAddress();
+//                int clientPort = request.getPort();
+//                byte[] sendData = messageToSend.getBytes();
+//                DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
+//                socket.send(response);
             }
 
-        } catch (IOException | ClassNotFoundException e) {
-            System.out.println("Socket is closed. Exiting");
-            exit(0);
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
         }
     }
+
+//    public static void listenForUDP() {
+//        ServerSocket serverSocket=null;
+//        try {
+//            while(true) {
+//                // Listen for incoming UDP packets
+//                System.out.println("Listening for client connections on server port: "+SERVER_PORT);
+//                //This creates a new connection at the specified server port
+//                serverSocket = new ServerSocket(SERVER_PORT);
+//                // Receive incoming UDP packet
+//                Socket clientSocket = serverSocket.accept();
+//
+//                System.out.println("Connection from the client "+clientSocket.getInetAddress().getHostAddress());
+//                SERVER_PORT++; // so if another client tries to connect, it will not crash the server
+//
+//                handleMessage(clientSocket);
+//            }
+//
+//        } catch (IOException | ClassNotFoundException e) {
+//            System.out.println("Socket is closed. Exiting");
+//            exit(0);
+//            throw new RuntimeException(e);
+//        }
+//    }
 
     /**
      * This method receives the message that is being sent by the client
      * Decides what method to execute
-     * @param clientSocket is the connection the client established
      * @throws IOException
      * @throws ClassNotFoundException
      */
-    private static void handleMessage(Socket clientSocket) throws IOException, ClassNotFoundException {
-        while(true){
-            //Writing out to the client
-            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-            //Taking in what the client wrote
-            ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-            //This reads the message that is sent from the client and deserializes it and the server waits here
-            Message incoming = (Message) in.readObject();
-            //Probably can be a case statement
-            //This statement chooses what action to do depending on the action sent
-            switch (incoming.getAction()){
+    private static void handleMessage(Message receivedMessage,DatagramSocket socket) throws IOException, ClassNotFoundException {
+        //This statement chooses what action to do depending on the action sent
+            switch (receivedMessage.getAction()){
                 case REGISTER :
-                        handleRegistration(incoming,out);
+                        handleRegistration(receivedMessage,socket);
                     break;
                 case DE_REGISTER :
-                    handleDeregistration(incoming,out,clientSocket);
+                    //handleDeregistration(incoming,out,clientSocket);
                     break;
             }
 
-        }
+
     }
 
     /**
      * This method is handles when the user is trying to Register
      * @param incoming this is the message that is being sent from the client
-     * @param out this is the output streams so this function can send a message back to client
      * @throws IOException
      */
-    private static void handleRegistration(Message incoming,ObjectOutputStream out) throws IOException {
-        Message outgoing = checkIfClientExists( incoming.getClientInfo());
-        System.out.println(outgoing);
+    private static void handleRegistration(Message incoming,DatagramSocket socket) throws IOException {
+        Message outgoingMessage = checkIfClientExists( incoming.getClientInfo());
+        System.out.println(outgoingMessage);
 
-        if(outgoing.getAction() == Status.REGISTERED){
+        if(outgoingMessage.getAction() == Status.REGISTERED){
             clients.add(incoming.getClientInfo());
             registeredClients++;
             System.out.println("ADDED");
         }
-        out.writeObject(outgoing);
+
+        // Send response to client
+        InetAddress clientAddress = incoming.getClientInfo().getIpAddress();
+        //NEED TO STORE THE CLIENT CHOSEN PORT IN THEIR OBJECT SO WE CAN JUST DO
+
+        int clientPort = 8080; //incoming.getClientInfo().getPort();
+
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+        objectOutputStream.writeObject(outgoingMessage);
+        objectOutputStream.flush();
+
+        byte [] messageToSend = byteArrayOutputStream.toByteArray();
+
+        DatagramPacket response = new DatagramPacket(messageToSend, messageToSend.length, clientAddress, clientPort);
+        socket.send(response);
     }
 
     /**

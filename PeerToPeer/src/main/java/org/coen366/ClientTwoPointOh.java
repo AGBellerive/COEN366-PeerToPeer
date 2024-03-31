@@ -12,17 +12,37 @@ public class ClientTwoPointOh {
 
     private static int serverPort;
 
+    private static int CLIENT_PORT = 8080;
+    private static int SERVER_PORT = 3000;
+
     public static void main(String[] args) {
-        System.out.println("Enter the port you wish to connect to (Starting at 3000): ");
-        int enteredClientPort = Integer.parseInt(getUserInput());
+//        System.out.println("Enter the port you wish to connect to: ");
+//        int enteredClientPort = Integer.parseInt(getUserInput());
 
-        System.out.println("Enter the server port you wish to connect to (Starting at 3000): ");
-        serverPort = Integer.parseInt(getUserInput());
-
+//        System.out.println("Enter the server port you wish to connect to (Starting at 3000): ");
+//        serverPort = Integer.parseInt(getUserInput());
+        byte[] buffer = new byte[5000];
         try {
             //This connects the user to the specified port ngl idk if it should work like this
-            clientSocket = new DatagramSocket(serverPort);
-            clientSocket.setSoTimeout(10000);
+            clientSocket = new DatagramSocket(CLIENT_PORT);
+            clientSocket.setSoTimeout(10000); // 10 second timeout
+            InetAddress clientAddress = InetAddress.getLocalHost();
+
+            String connectionMessage = "I am client " + clientAddress.getHostAddress() + " connecting on the port "+ CLIENT_PORT ;
+
+            //Prepares the message to be sent in a byte array
+            byte[] sendData = connectionMessage.getBytes();
+
+            //Sends message to server
+            InetAddress serverAddress = InetAddress.getByName("localhost");
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, SERVER_PORT);
+            clientSocket.send(sendPacket);
+
+            //Receives response from server
+            DatagramPacket serverResponse = new DatagramPacket(buffer, buffer.length);
+            clientSocket.receive(serverResponse);
+            String responseMessage = new String(serverResponse.getData(), 0, serverResponse.getLength());
+            System.out.println(responseMessage);
 
             while (true) {
                 printOptions();
@@ -39,8 +59,8 @@ public class ClientTwoPointOh {
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
-            System.out.println("The connection has an error. Exiting...");
-            exit(0);
+//            System.out.println("The connection has an error. Exiting...");
+//            exit(0);
             throw new RuntimeException(e);
         }
         finally {
@@ -62,6 +82,7 @@ public class ClientTwoPointOh {
             System.out.println("2.DE_REGISTER");
             System.out.println("3.Return");
             String input = getUserInput();
+
             switch(input) {
                 case "1":
                     storedClient = registerWithServerTwoPointOh(ClientTwoPointOh.clientSocket);
@@ -99,10 +120,26 @@ public class ClientTwoPointOh {
 
         //Creates a client with the entered name and with their ipaddress
         ClientInfo clientInfo = new ClientInfo(name,clientAddress);
-        //Creates a message of registration
-        Message incoming = getMessage(socket, clientInfo);
+        Message outgoingRegister = new Message(Status.REGISTER,clientInfo.getRqNum(),clientInfo);
 
-        System.out.println(incoming);
+        //Prepares the message to be sent
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+        objectOutputStream.writeObject(outgoingRegister);
+        objectOutputStream.flush();
+
+        byte [] sendMessgae = byteArrayOutputStream.toByteArray();
+
+        //Sends message to server
+        InetAddress serverAddress = InetAddress.getByName("localhost");
+        DatagramPacket sendPacket = new DatagramPacket(sendMessgae, sendMessgae.length, serverAddress, SERVER_PORT);
+        clientSocket.send(sendPacket);
+
+
+        //Creates a message of registration
+        //Message incoming = getMessage(socket, clientInfo);
+
+        //System.out.println(incoming);
         return clientInfo;
     }
 
