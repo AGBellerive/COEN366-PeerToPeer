@@ -10,13 +10,15 @@ public class ClientInfo implements Serializable {
     private InetAddress  ipAddress;
     private List<String> files;
     private int rqNum;
+    private int clientPort;
 
 
-    public ClientInfo(String name, InetAddress ipAddress) {
+    public ClientInfo(String name, InetAddress ipAddress,int clientPort) {
         this.name = name;
         this.ipAddress = ipAddress;
         this.files = new ArrayList<>();
         this.rqNum = 0;
+        this.clientPort = clientPort;
     }
 
     public String getName() {
@@ -53,6 +55,14 @@ public class ClientInfo implements Serializable {
 
     public void addToFiles(String file){
         this.files.add(file);
+    }
+
+    public int getClientPort() {
+        return clientPort;
+    }
+
+    public void setClientPort(int clientPort) {
+        this.clientPort = clientPort;
     }
 
     @Override

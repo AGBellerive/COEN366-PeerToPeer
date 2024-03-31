@@ -42,23 +42,8 @@ public class ServerTwoPointOh {
             // Listen for incoming UDP packets
             while(true) {
                 // Receive incoming UDP packet
-                request = new DatagramPacket(buffer, buffer.length);
-                socket.receive(request);
-
-                //receives the data and casts it to a Message object
-                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
-                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-                Message receivedMessage = (Message)objectInputStream.readObject();
+                Message receivedMessage = receiveMessageFromClient(socket);
                 handleMessage(receivedMessage,socket);
-
-//                // Process the packet
-//
-//                // Send response to client
-//                InetAddress clientAddress = request.getAddress();
-//                int clientPort = request.getPort();
-//                byte[] sendData = messageToSend.getBytes();
-//                DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
-//                socket.send(response);
             }
 
         } catch (Exception e) {
@@ -68,6 +53,19 @@ public class ServerTwoPointOh {
                 socket.close();
             }
         }
+    }
+
+    private static Message receiveMessageFromClient(DatagramSocket socket) throws IOException, ClassNotFoundException {
+        //Define 5000 bytes for the message to be stored
+        byte[] buffer = new byte[5000];
+
+        DatagramPacket request = new DatagramPacket(buffer, buffer.length);
+        socket.receive(request); //stores the received message in the buffer variable
+
+        //receives the data and casts it to a Message object
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
+        ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+        return (Message)objectInputStream.readObject();
     }
 
 //    public static void listenForUDP() {
@@ -104,14 +102,12 @@ public class ServerTwoPointOh {
         //This statement chooses what action to do depending on the action sent
             switch (receivedMessage.getAction()){
                 case REGISTER :
-                        handleRegistration(receivedMessage,socket);
+                    handleRegistration(receivedMessage,socket);
                     break;
                 case DE_REGISTER :
-                    //handleDeregistration(incoming,out,clientSocket);
+                    handleDeregistration(receivedMessage,socket);
                     break;
             }
-
-
     }
 
     /**
@@ -128,12 +124,30 @@ public class ServerTwoPointOh {
             registeredClients++;
             System.out.println("ADDED");
         }
+        sendMessageToClient(incoming, socket, outgoingMessage);
+    }
+    private static void handleDeregistration(Message incoming,DatagramSocket socket) throws IOException {
+        ClientInfo deregisteringClient = incoming.getClientInfo();
+        for (int i =0; i < clients.size();i++) {
+            ClientInfo currentClient = clients.get(i);
+            if(currentClient.getName().equalsIgnoreCase(deregisteringClient.getName())){
+                clients.remove(i);
+                registeredClients--;
+                break;
+            }
+        }
 
+        Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
+        sendMessageToClient(incoming,socket,outgoing);
+        socket.close();
+    }
+
+
+    private static void sendMessageToClient(Message incoming, DatagramSocket socket, Message outgoingMessage) throws IOException {
         // Send response to client
         InetAddress clientAddress = incoming.getClientInfo().getIpAddress();
-        //NEED TO STORE THE CLIENT CHOSEN PORT IN THEIR OBJECT SO WE CAN JUST DO
 
-        int clientPort = 8080; //incoming.getClientInfo().getPort();
+        int clientPort = incoming.getClientInfo().getClientPort();
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
@@ -174,17 +188,4 @@ public class ServerTwoPointOh {
      * @param clientSocket the socket so that we can close it
      * @throws IOException
      */
-    private static void handleDeregistration(Message incoming,ObjectOutputStream out,Socket clientSocket) {
-        System.out.println("Dereg");
-        clients.remove(incoming.getClientInfo());
-        registeredClients--;
-        Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
-        try {
-            out.writeObject(outgoing);
-            clientSocket.close();
-        } catch (IOException e) {
-            System.out.println("Closing socket with "+ clientSocket.getInetAddress().getHostAddress());
-            //throw new RuntimeException(e);
-        }
-    }
 }

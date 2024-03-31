@@ -16,14 +16,11 @@ public class ClientTwoPointOh {
     private static int SERVER_PORT = 3000;
 
     public static void main(String[] args) {
-//        System.out.println("Enter the port you wish to connect to: ");
-//        int enteredClientPort = Integer.parseInt(getUserInput());
+        System.out.println("Enter the port you wish to connect to: ");
+        CLIENT_PORT = Integer.parseInt(getUserInput());
 
-//        System.out.println("Enter the server port you wish to connect to (Starting at 3000): ");
-//        serverPort = Integer.parseInt(getUserInput());
         byte[] buffer = new byte[5000];
         try {
-            //This connects the user to the specified port ngl idk if it should work like this
             clientSocket = new DatagramSocket(CLIENT_PORT);
             clientSocket.setSoTimeout(10000); // 10 second timeout
             InetAddress clientAddress = InetAddress.getLocalHost();
@@ -59,8 +56,8 @@ public class ClientTwoPointOh {
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
-//            System.out.println("The connection has an error. Exiting...");
-//            exit(0);
+            System.out.println("The connection has an error. Exiting...");
+            exit(0);
             throw new RuntimeException(e);
         }
         finally {
@@ -71,7 +68,7 @@ public class ClientTwoPointOh {
     }
 
     /**
-     * When the user chooses the option 1, they will be placed in loop of options
+     * This offers the user options to register or return to main menu
      * @throws IOException
      * @throws ClassNotFoundException
      */
@@ -85,11 +82,12 @@ public class ClientTwoPointOh {
 
             switch(input) {
                 case "1":
-                    storedClient = registerWithServerTwoPointOh(ClientTwoPointOh.clientSocket);
+                    registerWithServerTwoPointOh(ClientTwoPointOh.clientSocket);
                     break;
                 case "2":
                     if(storedClient != null){
-//                        deregisterWithServer(ClientTwoPointOh.clientSocket);
+                        deregisterWithServer(ClientTwoPointOh.clientSocket);
+                        exit(0);
                         return;
                     }
                     else{
@@ -102,124 +100,109 @@ public class ClientTwoPointOh {
                     System.out.println("Invalid option");
             }
         }
-
     }
 
     /**
      * This method deals with any registration the user does
-     * @param socket the current connection
+     * @param clientSocket the current connection
      * @return the clientInfo and stores it into a static field
      * @throws IOException
      * @throws ClassNotFoundException
+     * @author Alex
      */
-    private static ClientInfo registerWithServerTwoPointOh(DatagramSocket socket) throws IOException, ClassNotFoundException {
+    private static void registerWithServerTwoPointOh(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
         System.out.println("Enter your name");
         String name = getUserInput();
 
         InetAddress clientAddress = InetAddress.getLocalHost();
 
         //Creates a client with the entered name and with their ipaddress
-        ClientInfo clientInfo = new ClientInfo(name,clientAddress);
+        ClientInfo clientInfo = new ClientInfo(name,clientAddress,CLIENT_PORT);
         Message outgoingRegister = new Message(Status.REGISTER,clientInfo.getRqNum(),clientInfo);
 
+        //Sends a message to the server, in this case, it sends a register message
+        sendMessageToServer(outgoingRegister);
+
+        //Creates a message of registration
+        Message incoming = getMessageFromServer(clientSocket);
+
+        // System.out.println(incoming);
+        switch (incoming.getAction()){
+            case REGISTER_DENIED:
+                System.out.println("DENIED: "+incoming.getReason());
+                break;
+            case REGISTERED:
+                System.out.println("Registration Successful");
+                storedClient = clientInfo;
+                break;
+        }
+    }
+
+    /**
+     * This method sends a message object to the server
+     * @param outgoingMessage this is the message we are sending
+     * @throws IOException
+     * @author Alex & Sunil
+     */
+    private static void sendMessageToServer(Message outgoingMessage) throws IOException {
         //Prepares the message to be sent
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-        objectOutputStream.writeObject(outgoingRegister);
+        objectOutputStream.writeObject(outgoingMessage);
         objectOutputStream.flush();
 
-        byte [] sendMessgae = byteArrayOutputStream.toByteArray();
+        byte [] sendMessage = byteArrayOutputStream.toByteArray();
 
         //Sends message to server
         InetAddress serverAddress = InetAddress.getByName("localhost");
-        DatagramPacket sendPacket = new DatagramPacket(sendMessgae, sendMessgae.length, serverAddress, SERVER_PORT);
+        DatagramPacket sendPacket = new DatagramPacket(sendMessage, sendMessage.length, serverAddress, SERVER_PORT);
         clientSocket.send(sendPacket);
-
-
-        //Creates a message of registration
-        //Message incoming = getMessage(socket, clientInfo);
-
-        //System.out.println(incoming);
-        return clientInfo;
     }
 
-    private static Message getMessage(DatagramSocket socket, ClientInfo clientInfo) throws IOException, ClassNotFoundException {
-        Message registerMessage = new Message(Status.REGISTER, clientInfo.getRqNum(), clientInfo);
+    /**
+     * This method receives the message back from the server
+     * @param clientSocket
+     * @return the message sent from the server
+     * @throws IOException
+     * @throws ClassNotFoundException
+     * @author Alex & Sunil
+     */
+    private static Message getMessageFromServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
+        //Prepares the space for the message to be stored in
+        byte[] buffer = new byte[5000];
 
-//        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-//        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-        //Sends out the register message to the server
-//        out.writeObject(registerMessage);
+        DatagramPacket request = new DatagramPacket(buffer, buffer.length);
+        //waits for the message to be recieved
+        clientSocket.receive(request);
 
-        byte[] sendData = registerMessage.toString().getBytes();
-        InetAddress serverAddress = InetAddress.getByName("localhost");
-        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, serverPort);
-        socket.send(sendPacket);
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
+        ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
-        //This waits for the server to respond back with the confirmation
-//        return (Message) in.readObject();
-
-
-        try
-        {      InetAddress address = InetAddress.getByName("localhost");
-            ByteArrayOutputStream byteStream = new
-                    ByteArrayOutputStream(5000);
-            ObjectOutputStream os = new ObjectOutputStream(new
-                    BufferedOutputStream(byteStream));
-            os.flush();
-            os.writeObject(registerMessage);
-            os.flush();
-            //retrieves byte array
-            byte[] sendBuf = byteStream.toByteArray();
-            DatagramPacket packet = new DatagramPacket(
-                    sendBuf, sendBuf.length, serverAddress, serverPort);
-            int byteCount = packet.getLength();
-            clientSocket.send(packet);
-            os.close();
-
-
-            // receive response
-            byte[] recvBuf = new byte[5000];
-            DatagramPacket receivedPacket = new DatagramPacket(recvBuf,
-                    recvBuf.length);
-            clientSocket.receive(receivedPacket);
-            int byteCounts = receivedPacket.getLength();
-            ByteArrayInputStream receiveByteStream = new
-                    ByteArrayInputStream(recvBuf);
-            ObjectInputStream is = new
-                    ObjectInputStream(new BufferedInputStream(receiveByteStream));
-            Message receivedMessage = (Message)is.readObject();
-            is.close();
-            System.out.println(receivedMessage);
-            return receivedMessage;
-
-        }
-        catch (UnknownHostException e)
-        {
-            System.err.println("Exception:  " + e);
-            e.printStackTrace();    }
-        catch (IOException e)    { e.printStackTrace();
-        }
-return null;
+        //converts the buffer into a Message object
+        return (Message)objectInputStream.readObject();
     }
 
-    private static void deregisterWithServer(Socket socket) throws IOException, ClassNotFoundException {
+    private static void deregisterWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
         Message deRegisterMessage = new Message(Status.DE_REGISTER,storedClient.getRqNum(),storedClient);
+        sendMessageToServer(deRegisterMessage);
 
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-        out.writeObject(deRegisterMessage);
-
-        Message incoming = (Message) in.readObject();
+        Message incoming = getMessageFromServer(clientSocket);
         System.out.println(incoming);
-        socket.close();
+        System.out.println("Deregestration complete");
     }
 
+    /**
+     * @author Sunil
+     * @return The users input
+     */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
         return scanner.nextLine();
     }
 
+    /**
+     * @author Sunil
+     */
     private static void printOptions(){
         System.out.println("Select an Option: ");
         System.out.println("1. Register");
