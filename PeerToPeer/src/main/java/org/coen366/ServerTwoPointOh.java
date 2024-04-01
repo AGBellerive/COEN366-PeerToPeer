@@ -120,6 +120,11 @@ public class ServerTwoPointOh {
                 case DE_REGISTER :
                     handleDeregistration(receivedMessage,socket);
                     break;
+                case PUBLISH:
+                    handlePublish(receivedMessage,socket);
+                    break;
+                case REMOVE:
+                    break;
             }
     }
 
@@ -130,6 +135,7 @@ public class ServerTwoPointOh {
      */
     private static void handleRegistration(Message incoming,DatagramSocket socket) throws IOException {
         Message outgoingMessage = checkIfClientExists( incoming.getClientInfo());
+        System.out.println(incoming);
         System.out.println(outgoingMessage);
 
         if(outgoingMessage.getAction() == Status.REGISTERED){
@@ -160,6 +166,25 @@ public class ServerTwoPointOh {
         Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
         sendMessageToClient(incoming,socket,outgoing);
         socket.close();
+    }
+
+    private static void handlePublish(Message incoming,DatagramSocket socket) throws IOException {
+        System.out.println(incoming);
+        // update the user in the list "clients"
+        Message outgoingMessage = checkIfFileExists(incoming.getClientInfo());
+
+        if(outgoingMessage.getAction() == Status.PUBLISHED){
+            ClientInfo searchedClient = incoming.getClientInfo();
+            //If the file is approved, update the client being stored in the clients list
+            for (int i = 0; i < clients.size(); i++) {
+                if(clients.get(i).getName().equalsIgnoreCase(searchedClient.getName())){
+                    // Instead of modifying the list of files for the searched user, Just replace the whole user
+                    // with the updated field
+                    clients.set(i,searchedClient);
+                }
+            }
+        }
+        sendMessageToClient(incoming,socket,outgoingMessage);
     }
 
 
@@ -201,4 +226,19 @@ public class ServerTwoPointOh {
         return outgoing;
     }
 
+    private static Message checkIfFileExists(ClientInfo client){
+        String newFile = client.getFiles().get(client.getFiles().size() -1 );
+        //Gets the last file in the file list
+
+        Message outgoing = new Message(Status.PUBLISHED,client.getRqNum());
+        //If the file is not there, we will return this message, if not the foreach loop will change it
+
+        for(ClientInfo selectedClient : clients){
+            if(selectedClient.getName().equalsIgnoreCase(client.getName())){ // Finds specific user by looping all the users
+                if(selectedClient.getFiles().contains(newFile))
+                    outgoing = new Message(Status.PUBLISH_DENIED,client.getRqNum(),"This file already exists in your list");
+            }
+        }
+        return outgoing;
+    }
 }

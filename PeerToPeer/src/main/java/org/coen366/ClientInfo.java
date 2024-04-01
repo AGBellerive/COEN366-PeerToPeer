@@ -41,9 +41,9 @@ public class ClientInfo implements Serializable {
         return files;
     }
 
-    public void setFiles(List<String> files) {
-        this.files = files;
-    }
+//    public void setFiles(List<String> files) {
+//        this.files = files;
+//    }
 
     public int getRqNum() {
         return rqNum;
@@ -63,6 +63,10 @@ public class ClientInfo implements Serializable {
 
     public void setClientPort(int clientPort) {
         this.clientPort = clientPort;
+    }
+
+    public void incrementRqNum(){
+        this.rqNum++;
     }
 
     @Override
