@@ -2,6 +2,7 @@ package org.coen366;
 
 import java.io.*;
 import java.net.*;
+import java.util.List;
 import java.util.Scanner;
 
 import static java.lang.System.exit;
@@ -9,6 +10,8 @@ import static java.lang.System.exit;
 public class ClientTwoPointOh {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
+
+    private List<ClientInfo> listOfClientInformations;
 
     private static int CLIENT_PORT = 8080;
     private static int SERVER_PORT = 3000;

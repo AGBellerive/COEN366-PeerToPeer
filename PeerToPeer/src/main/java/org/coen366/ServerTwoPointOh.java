@@ -132,16 +132,18 @@ public class ServerTwoPointOh {
      * @throws IOException
      */
     private static void handleRegistration(Message incoming,DatagramSocket socket) throws IOException {
-        Message outgoingMessage = checkIfClientExists( incoming.getClientInfo());
+        ClientInfo clientInfo = incoming.getClientInfo();
+        Message outgoingMessage = checkIfClientExists( clientInfo);
         System.out.println(incoming);
         System.out.println(outgoingMessage);
 
         if(outgoingMessage.getAction() == Status.REGISTERED){
-            clients.add(incoming.getClientInfo());
+            clients.add(clientInfo);
             registeredClients++;
             System.out.println("ADDED");
         }
-        sendMessageToClient(incoming, socket, outgoingMessage);
+        sendMessageToClient(clientInfo, socket, outgoingMessage);
+        handleUpdate();
     }
 
     /**
@@ -162,17 +164,18 @@ public class ServerTwoPointOh {
         }
 
         Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
-        sendMessageToClient(incoming,socket,outgoing);
+        sendMessageToClient(deregisteringClient,socket,outgoing);
 //        socket.close();
     }
 
     private static void handlePublish(Message incoming,DatagramSocket socket) throws IOException {
+        ClientInfo clientInfo = incoming.getClientInfo();
         System.out.println(incoming);
         // update the user in the list "clients"
-        Message outgoingMessage = checkIfFileExists(incoming.getClientInfo());
+        Message outgoingMessage = checkIfFileExists(clientInfo);
 
         if(outgoingMessage.getAction() == Status.PUBLISHED){
-            ClientInfo searchedClient = incoming.getClientInfo();
+            ClientInfo searchedClient = clientInfo;
             //If the file is approved, update the client being stored in the clients list
             for (int i = 0; i < clients.size(); i++) {
                 if(clients.get(i).getName().equalsIgnoreCase(searchedClient.getName())){
@@ -182,15 +185,29 @@ public class ServerTwoPointOh {
                 }
             }
         }
-        sendMessageToClient(incoming,socket,outgoingMessage);
+        sendMessageToClient(clientInfo,socket,outgoingMessage);
     }
 
+    /**
+     * Anytime something happens on the server, the server must update all the registered clients with an UDPATE message
+     * containing the list of currently registered clients and the files currently proposed to share
+     *
+     * TODO(sunil): this method must be called after every action that changes the list of clients or the list of files and if no action like that occurs, then at max 5 minutes after its last call
+     */
+    private static void handleUpdate() throws IOException {
+        Message messageToSend = new Message(Status.UPDATE,0);
+        messageToSend.setListOfClientsForUpdate(clients);
+        for(ClientInfo client : clients){
+            // Send an update message to all clients
+            sendMessageToClient(client, serverSocket, new Message(Status.UPDATE, client.getRqNum()));
+        }
+    }
 
-    private static void sendMessageToClient(Message incoming, DatagramSocket socket, Message outgoingMessage) throws IOException {
+    private static void sendMessageToClient(ClientInfo clientInfo, DatagramSocket socket, Message outgoingMessage) throws IOException {
         // Send response to client
-        InetAddress clientAddress = incoming.getClientInfo().getIpAddress();
+        InetAddress clientAddress = clientInfo.getIpAddress();
 
-        int clientPort = incoming.getClientInfo().getClientPort();
+        int clientPort = clientInfo.getClientPort();
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
