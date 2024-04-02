@@ -76,6 +76,7 @@ public class ClientInfo implements Serializable {
                 ", ipAddress=" + ipAddress +
                 ", files=" + files +
                 ", rqNum=" + rqNum +
+                ", clientPort=" + clientPort +
                 '}';
     }
 }

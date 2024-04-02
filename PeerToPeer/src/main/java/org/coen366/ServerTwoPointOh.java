@@ -6,13 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-import static java.lang.System.exit;
-
 public class ServerTwoPointOh {
     private static int SERVER_PORT = 3000;
     private static int registeredClients = 0; // Initialize the variable
     private static List<ClientInfo> clients = new ArrayList<>();
 
+    private static DatagramSocket serverSocket = null;
 
     public static void main(String[] args) {
         listenForUDP();
@@ -22,16 +21,15 @@ public class ServerTwoPointOh {
         System.out.println("Enter the server port you wish to start to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
 
-        DatagramSocket socket = null;
         try {
-            socket = new DatagramSocket(SERVER_PORT);
+            serverSocket = new DatagramSocket(SERVER_PORT);
             byte[] buffer = new byte[5000];
 
             System.out.println("Listening for client connections on server port: "+SERVER_PORT);
 
             //Receives initial connection message
             DatagramPacket request = new DatagramPacket(buffer, buffer.length);
-            socket.receive(request);
+            serverSocket.receive(request);
             String connectionMessage = new String(request.getData(), 0, request.getLength());
             System.out.println(connectionMessage);
 
@@ -41,20 +39,20 @@ public class ServerTwoPointOh {
             int clientPort = request.getPort();
             byte[] sendData = messageToSend.getBytes();
             DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
-            socket.send(response);
+            serverSocket.send(response);
 
             // Listen for incoming UDP packets
             while(true) {
                 // Receive incoming UDP packet
-                Message receivedMessage = receiveMessageFromClient(socket);
-                handleMessage(receivedMessage,socket);
+                Message receivedMessage = receiveMessageFromClient(serverSocket);
+                handleMessage(receivedMessage, serverSocket);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
             }
         }
     }
@@ -165,7 +163,7 @@ public class ServerTwoPointOh {
 
         Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
         sendMessageToClient(incoming,socket,outgoing);
-        socket.close();
+//        socket.close();
     }
 
     private static void handlePublish(Message incoming,DatagramSocket socket) throws IOException {
