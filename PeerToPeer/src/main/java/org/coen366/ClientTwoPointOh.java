@@ -314,4 +314,53 @@ public class ClientTwoPointOh {
     }
 
 
+    //2.4 File transfer between clients (peers)
+    //File request
+    private void requestFile(InetAddress IPAddressPeer, String fileName  ){
+        try{
+            //send file request to peer FILE-REQ | RQ# | File-name
+            //string for now will change depending on how we will receive the message
+            String message = "FILE-REQ" + "|" + Client.getRqNum() + "|" + fileName;
+
+            //convert message into byte to send UDP
+            byte[] transferInfo = message.getBytes();
+
+            //to send the packet (Lab 2, slide 20...)
+            DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, SERVER_PORT);
+            clientSocket.send(sendPacket);
+
+            //Get answer from peer
+            byte[] receiveData = new byte[1024];
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+            clientSocket.receive(receivePacket);
+            //convert to string
+            String response = new String(receivePacket.getData(),0,receivePacket.getLength());
+
+            //confirmed or not
+            //again will depend how we send the message
+            //FILE-CONF | RQ# | TCP socket#
+            if (response.startsWith("FILE-CONF")){
+                String[] seperateInfo = response.split("|");
+                int tcpSocket = Integer.parseInt(seperateInfo[2]);//3rd index (TCP socket#)
+                transferFile(IPAddressPeer, tcpSocket, fileName);//still need to implement
+            } else {
+                System.out.println("file does not exist at destination or cannot transfer now");
+            }
+
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    //File confirmation
+
+
+
+    //File transfer
+    private void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName){
+
+    }
+
+
+
 }
