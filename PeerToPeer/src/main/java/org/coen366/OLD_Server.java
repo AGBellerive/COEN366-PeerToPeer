@@ -5,7 +5,7 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Server {
+public class OLD_Server {
 
     private static final int SERVER_PORT = 3000;
     private static int registeredClients = 0; // Initialize the variable
@@ -114,7 +114,7 @@ public class Server {
     }
 
     public static void setClients(List<String> clients) {
-        Server.clients = clients;
+        OLD_Server.clients = clients;
     }
 
 }
@@ -139,7 +139,7 @@ class TCPClientHandler implements Runnable {
                 // Register the client
                 out.println("BEGIN-FILE-TRANSFER");
                 String client = in.readLine();
-                Server.getClients().add(client);
+                OLD_Server.getClients().add(client);
 
             }
 

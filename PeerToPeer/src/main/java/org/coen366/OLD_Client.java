@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.net.*;
 import java.util.Scanner;
 import java.net.InetAddress;
-public class Client {
+public class OLD_Client {
 
     private static final int SERVER_PORT = 3000;
 
@@ -21,7 +21,7 @@ public class Client {
     private final InetAddress clientAddress;
 
 
-    public Client(String clientName, DatagramSocket datagramSocket, InetAddress clientAddress) {
+    public OLD_Client(String clientName, DatagramSocket datagramSocket, InetAddress clientAddress) {
 
         // ask user for (udp socket number and ip address) of server
         // ask for clientNAme
@@ -48,17 +48,17 @@ public class Client {
             socket.setSoTimeout(10000); // 10 second timeout
             InetAddress clientAddress = InetAddress.getLocalHost();
 
-            Client client = new Client("CLIENT_1", socket, clientAddress);
+            OLD_Client OLDClient = new OLD_Client("CLIENT_1", socket, clientAddress);
 
             while (true) {
                 printOptions();
                 String input = getUserInput();
                 switch(input) {
                     case "1":
-                        client.registerWithServer();
+                        OLDClient.registerWithServer();
                         break;
                     case "2":
-                        client.sendRandomMessage();
+                        OLDClient.sendRandomMessage();
                         break;
                     default:
                         System.out.println("Invalid option");
@@ -173,7 +173,7 @@ public class Client {
     }
 
     public static void setRqNum(int rqNum) {
-        Client.rqNum = rqNum;
+        OLD_Client.rqNum = rqNum;
     }
 
     //2.4 File transfer between clients (peers)
@@ -182,7 +182,7 @@ public class Client {
         try{
             //send file request to peer FILE-REQ | RQ# | File-name
             //string for now will change depending on how we will receive the message
-            String message = "FILE-REQ" + "|" + Client.getRqNum() + "|" + fileName;
+            String message = "FILE-REQ" + "|" + OLD_Client.getRqNum() + "|" + fileName;
 
             //convert message into byte to send UDP
             byte[] transferInfo = message.getBytes();
