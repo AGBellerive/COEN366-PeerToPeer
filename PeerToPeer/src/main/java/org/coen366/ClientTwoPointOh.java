@@ -13,141 +13,325 @@ public class ClientTwoPointOh {
 
     private List<ClientInfo> listOfClientInformations;
 
-    private static int CLIENT_PORT = 8080;
-    private static int SERVER_PORT = 3000;
+    private static int CLIENT_PORT = 8080; // is set in code
+    private static int SERVER_PORT = 3000; // is set in code
+
+    private static InetAddress clientAddress;
+
+    private static String currentFilePathToPublish;
+
+    private static final Object lock = new Object();
 
     public static void main(String[] args) {
         System.out.println("Enter the server port you wish to connect to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
 
-        System.out.println("Enter the port you wish to connect to: ");
+        System.out.println("Enter the port you wish to use as the client: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
 
-        byte[] buffer = new byte[5000];
-        try {
-            //Connects to the port specified by the user
-            clientSocket = new DatagramSocket(CLIENT_PORT);
-            clientSocket.setSoTimeout(10000); // 10 second timeout
-            InetAddress clientAddress = InetAddress.getLocalHost();
+        ClientSender clientSender = new ClientSender();
+        Thread clientThread = new Thread(clientSender);
+        clientThread.start();
 
-            //Will send this message to the server to display
-            String connectionMessage = "I am client " + clientAddress.getHostAddress() + " connecting on the port "+ CLIENT_PORT ;
+        ClientReceiver clientReceiver = new ClientReceiver();
+        Thread clientReceiverThread = new Thread(clientReceiver);
+        clientReceiverThread.start();
+    }
 
-            //Prepares the message to be sent in a byte array
-            byte[] sendData = connectionMessage.getBytes();
+    /**
+     * Should handle all logic related to sending messages to the server where user input is required
+     */
+    static class ClientSender implements Runnable {
+        @Override
+        public void run() {
+            try {
+                //Connects to the port specified by the user
+                clientSocket = new DatagramSocket(CLIENT_PORT);
+//                clientSocket.setSoTimeout(10000); // 10 second timeout (verify if we need to timeout or not)(note: when we timeout, the program crashes after the timeout is reached)
+                clientAddress = InetAddress.getLocalHost();
 
-            //Sends message to server
-            InetAddress serverAddress = InetAddress.getByName("localhost");
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, SERVER_PORT);
-            clientSocket.send(sendPacket);
 
-            //Receives response from server
-            DatagramPacket serverResponse = new DatagramPacket(buffer, buffer.length);
-            clientSocket.receive(serverResponse);
-            String responseMessage = new String(serverResponse.getData(), 0, serverResponse.getLength());
-            System.out.println(responseMessage);
+                while (true) {
+                    printOptions();
+                    String input = getUserInput();
+                    switch (input) {
+                        case "1":
+                            printRegisterOptions();
+                            break;
+                        case "2":
+                            printPublishingOptions();
+                            break;
+                        default:
+                            System.out.println("Invalid option");
+                    }
+                }
+            } catch (IOException | ClassNotFoundException | InterruptedException e) {
+                System.out.println("The connection has an error. Exiting...");
+                exit(0);
+                throw new RuntimeException(e);
+            } finally {
+                if (clientSocket != null) {
+                    clientSocket.close();
+                }
+            }
+        }
 
+
+        /**
+         * @author Sunil
+         */
+        private static void printOptions() {
+            System.out.println("Select an Option: ");
+            System.out.println("1. Register");
+            System.out.println("2. Publish");
+            System.out.println("3. Update");
+            System.out.println("4. File transfer between clients");
+            System.out.println("5. Update contact information");
+            System.out.println("6. Wait to receive a message");
+        }
+
+        /**
+         * This offers the user options to register or return to main menu
+         * 2.1 Registration and De-registration
+         *
+         * @throws IOException
+         * @throws ClassNotFoundException
+         */
+        private static void printRegisterOptions() throws IOException, ClassNotFoundException, InterruptedException {
             while (true) {
-                printOptions();
-                String input = getUserInput();
-                switch(input) {
-                    case "1":
-                        printRegisterOptions();
+                System.out.println("Select a Register Option: ");
+                System.out.println("1. REGISTER");
+                System.out.println("2. DE_REGISTER");
+                System.out.println("3. Return");
+                int input = Integer.parseInt(getUserInput());
+
+                switch (input) {
+                    case 1:
+                        synchronized (lock) {
+                            registerWithServer(ClientTwoPointOh.clientSocket);
+                            lock.notify();
+                        }
                         break;
-                    case "2":
-                        printPublishingOptions();
+                    case 2:
+                        if (storedClient != null) {
+                            deregisterWithServer();
+                            return;
+                        } else {
+                            System.out.println("You have not registered. Returning to main menu");
+                        }
                         break;
+                    case 3:
+                        return;
                     default:
                         System.out.println("Invalid option");
                 }
             }
-        } catch (IOException | ClassNotFoundException | InterruptedException e) {
-            System.out.println("The connection has an error. Exiting...");
-            exit(0);
-            throw new RuntimeException(e);
         }
-        finally {
-            if(clientSocket != null){
-                clientSocket.close();
+
+        /**
+         * This method deals with any registration the user does
+         *
+         * @param clientSocket the current connection
+         * @return the clientInfo and stores it into a static field
+         * @throws IOException
+         * @throws ClassNotFoundException
+         * @author Alex
+         */
+        private static void registerWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException, InterruptedException {
+            System.out.println("Enter your name");
+            String name = getUserInput();
+
+            //Creates a client with the entered name and with their ipaddress
+            storedClient = new ClientInfo(name, clientAddress, CLIENT_PORT);
+            Message outgoingRegister = new Message(Status.REGISTER, storedClient.getRqNum(), storedClient);
+
+            //Sends a message to the server, in this case, it sends a register message
+            sendMessageToServer(outgoingRegister);
+
+        }
+
+        /**
+         * This method deregisters the user from the server
+         *
+         * @throws IOException
+         * @throws ClassNotFoundException
+         */
+        private static void deregisterWithServer() throws IOException, ClassNotFoundException {
+            Message deRegisterOutgoingMessage = new Message(Status.DE_REGISTER, storedClient.getRqNum(), storedClient);
+            sendMessageToServer(deRegisterOutgoingMessage);
+
+        }
+
+        /**
+         * This method prints out the options for publishing
+         *
+         * @throws IOException
+         * @throws ClassNotFoundException
+         * @throws InterruptedException
+         */
+        private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
+            if (storedClient == null) {
+                System.out.println("You must register first before publishing");
+                Thread.sleep(1000);
+                return;
+            }
+            while (true) {
+                System.out.println("Select a Publishing Option");
+                System.out.println("1. PUBLISH");
+                System.out.println("2. REMOVE");
+                int input = Integer.parseInt(getUserInput());
+
+                switch (input) {
+                    case 1:
+                        publishFileToServer();
+                        break;
+                    case 2:
+                        System.out.println("Not implemented yet relax");
+                        //removeFileFromServer();
+                        break;
+                    default:
+                        System.out.println("Invalid Option");
+                }
             }
         }
+
+        /**
+         * This method will send the server the file that the user wants to put available
+         * on the server. If the file exists it will send the required information to the
+         * server so the server can retain it
+         *
+         * @throws IOException
+         * @throws ClassNotFoundException
+         */
+        private static void publishFileToServer() throws IOException, ClassNotFoundException {
+            System.out.println("Enter the file path you want to publish to the server");
+            currentFilePathToPublish = getUserInput();
+            File publishedFile = new File(currentFilePathToPublish);
+
+            if (!(publishedFile.exists())) {
+                //The file does not exist therefore must tell the user and return back to main
+                System.out.println("The file path you entered is not found. Try again. Rerouting you back...");
+                return;
+            }
+
+            System.out.println("File found.");
+            storedClient.addToFiles(currentFilePathToPublish);
+
+            //In stored client, there is a list that contains all the files that the user has. This has to be Extracted and stored on the server side
+            Message publishOutgoingMessage = new Message(Status.PUBLISH, storedClient.getRqNum(), storedClient);
+            sendMessageToServer(publishOutgoingMessage);
+        }
+
+        private static void removeFileFromServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
+//TODO
+            Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient);
+            sendMessageToServer(removeOutgoingMessage);
+        }
+
     }
 
     /**
-     * This offers the user options to register or return to main menu
-     * 2.1 Registration and De-registration
-     * @throws IOException
-     * @throws ClassNotFoundException
+     * Should handle all logic related to receiving messages from the server
      */
-    private static void printRegisterOptions() throws IOException, ClassNotFoundException, InterruptedException {
-        while (true){
-            System.out.println("Select a Register Option: ");
-            System.out.println("1. REGISTER");
-            System.out.println("2. DE_REGISTER");
-            System.out.println("3. Return");
-            int input = Integer.parseInt(getUserInput());
+    static class ClientReceiver implements Runnable {
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    synchronized (lock) {
+                        while (storedClient == null) {
+                            lock.wait();
+                        }
+                        Message receivedMessage = getMessageFromServer(storedClient);
+                        handleMessage(receivedMessage);
+                    }
+                }
+            } catch (IOException | ClassNotFoundException | InterruptedException e) {
+                System.out.println("The connection has an error. Exiting...");
+                exit(0);
+                throw new RuntimeException(e);
+            } finally {
+                if (clientSocket != null) {
+                    clientSocket.close();
+                }
+            }
+        }
 
-            switch(input) {
-                case 1:
-                    registerWithServer(ClientTwoPointOh.clientSocket);
+        private static void handleMessage(Message receivedMessage) throws IOException, InterruptedException {
+            switch (receivedMessage.getAction()) {
+                case REGISTERED:
+                    System.out.println("Registration Successful");
                     break;
-                case 2:
-                    if(storedClient != null){
-                        deregisterWithServer(ClientTwoPointOh.clientSocket);
-                        exit(0);
-                        return;
-                    }
-                    else{
-                        System.out.println("You have not registered. Returning to main menu");
-                    }
-                break;
-                case 3:
-                    return;
+                case DE_REGISTER:
+                    System.out.println(receivedMessage);
+                    System.out.println("Deregestration complete");
+                    clientSocket.close();
+                    exit(0);
+                case REGISTER_DENIED:
+                    System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient = null; // set it back to null since it failed
+                    break;
+                case PUBLISHED:
+                    System.out.println("Publish successful.");
+                    break;
+                case PUBLISH_DENIED:
+                    storedClient.getFiles().remove(currentFilePathToPublish);
+                    System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    break;
+                case REMOVED:
+                    break;
+                case REMOVED_DENIED:
+                    break;
+                case UPDATE:
+                    break;
+                case FILE_REQ:
+                    break;
+                case FILE_CONF:
+                    break;
+                case FILE_END:
+                    break;
+                case UPDATE_DENIED:
+                    break;
                 default:
                     System.out.println("Invalid option");
+
             }
         }
-    }
 
-    /**
-     * This method deals with any registration the user does
-     * @param clientSocket the current connection
-     * @return the clientInfo and stores it into a static field
-     * @throws IOException
-     * @throws ClassNotFoundException
-     * @author Alex
-     */
-    private static void registerWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException, InterruptedException {
-        System.out.println("Enter your name");
-        String name = getUserInput();
 
-        InetAddress clientAddress = InetAddress.getLocalHost();
+        /**
+         * This method receives the message back from the server
+         *
+         * @param client
+         * @return the message sent from the server
+         * @throws IOException
+         * @throws ClassNotFoundException
+         * @author Alex & Sunil
+         */
+        private static Message getMessageFromServer(ClientInfo client) throws IOException, ClassNotFoundException {
+            //Prepares the space for the message to be stored in
+            byte[] buffer = new byte[5000];
 
-        //Creates a client with the entered name and with their ipaddress
-        ClientInfo clientInfo = new ClientInfo(name,clientAddress,CLIENT_PORT);
-        Message outgoingRegister = new Message(Status.REGISTER,clientInfo.getRqNum(),clientInfo);
+            DatagramPacket request = new DatagramPacket(buffer, buffer.length);
+            //waits for the message to be received
+            clientSocket.receive(request); // will timeout after timeout is reached
 
-        //Sends a message to the server, in this case, it sends a register message
-        sendMessageToServer(outgoingRegister);
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
+            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
-        //Creates a message of registration
-        Message incoming = getMessageFromServer(clientSocket,clientInfo);
+            //Increments the rqNum because a rqNum is associated to a specific message
+            client.incrementRqNum();
 
-        // System.out.println(incoming);
-        switch (incoming.getAction()){
-            case REGISTER_DENIED:
-                System.out.println(incoming.getAction() + " Request Number: " + clientInfo.getRqNum()+ " " + incoming.getReason());
-                break;
-            case REGISTERED:
-                System.out.println("Registration Successful");
-                storedClient = clientInfo;
-                Thread.sleep(1000);
-                break;
+            //converts the buffer into a Message object
+            return (Message) objectInputStream.readObject();
         }
+
     }
+
 
     /**
      * This method sends a message object to the server
+     *
      * @param outgoingMessage this is the message we are sending
      * @throws IOException
      * @author Alex & Sunil
@@ -159,7 +343,7 @@ public class ClientTwoPointOh {
         objectOutputStream.writeObject(outgoingMessage);
         objectOutputStream.flush();
 
-        byte [] sendMessage = byteArrayOutputStream.toByteArray();
+        byte[] sendMessage = byteArrayOutputStream.toByteArray();
 
         //Sends message to server
         InetAddress serverAddress = InetAddress.getByName("localhost");
@@ -167,153 +351,14 @@ public class ClientTwoPointOh {
         clientSocket.send(sendPacket);
     }
 
-    /**
-     * This method receives the message back from the server
-     * @param clientSocket
-     * @param client
-     * @return the message sent from the server
-     * @throws IOException
-     * @throws ClassNotFoundException
-     * @author Alex & Sunil
-     */
-    private static Message getMessageFromServer(DatagramSocket clientSocket,ClientInfo client) throws IOException, ClassNotFoundException {
-        //Prepares the space for the message to be stored in
-        byte[] buffer = new byte[5000];
-
-        DatagramPacket request = new DatagramPacket(buffer, buffer.length);
-        //waits for the message to be received
-        clientSocket.receive(request);
-
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
-        ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-
-        //Increments the rqNum because a rqNum is associated to a specific message
-        client.incrementRqNum();
-
-        //converts the buffer into a Message object
-        return (Message)objectInputStream.readObject();
-    }
-
 
     /**
-     * This method deregisters the user from the server
-     * @param clientSocket this is passed to close the socket
-     * @throws IOException
-     * @throws ClassNotFoundException
-     */
-    private static void deregisterWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
-        Message deRegisterOutgoingMessage = new Message(Status.DE_REGISTER,storedClient.getRqNum(),storedClient);
-        sendMessageToServer(deRegisterOutgoingMessage);
-
-        Message incoming = getMessageFromServer(clientSocket,storedClient);
-        System.out.println(incoming);
-        System.out.println("Deregestration complete");
-        clientSocket.close();
-        exit(0);
-    }
-
-    /**
-     * This method prints out the options for publishing
-     * @throws IOException
-     * @throws ClassNotFoundException
-     * @throws InterruptedException
-     */
-    private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
-        if(storedClient == null){
-            System.out.println("You must register first before publishing");
-            Thread.sleep(1000);
-            return;
-        }
-        while (true){
-            System.out.println("Select a Publishing Option");
-            System.out.println("1. PUBLISH");
-            System.out.println("2. REMOVE");
-            int input = Integer.parseInt(getUserInput());
-
-            switch (input){
-                case 1:
-                    publishFileToServer(ClientTwoPointOh.clientSocket);
-                    break;
-                case 2:
-                    System.out.println("Not implemented yet relax");
-                    //removeFileFromServer();
-                    break;
-                default:
-                    System.out.println("Invalid Option");
-            }
-        }
-    }
-
-    /**
-     * This method will send the server the file that the user wants to put available
-     * on the server. If the file exists it will send the required information to the
-     * server so the server can retain it
-     * @param clientSocket
-     * @throws IOException
-     * @throws ClassNotFoundException
-     */
-    private static void publishFileToServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
-        System.out.println("Enter the file path you want to publish to the server");
-        String filePath = getUserInput();
-        File publishedFile = new File(filePath);
-
-        if(!(publishedFile.exists())){
-            //The file does not exist therefore must tell the user and return back to main
-            System.out.println("The file path you entered is not found. Try again. Rerouting you back...");
-            return;
-        }
-
-        System.out.println("File found.");
-        storedClient.addToFiles(filePath);
-
-        //In stored client, there is a list that contains all the files that the user has. This has to be Extracted and stored on the server side
-        Message publishOutgoingMessage = new Message(Status.PUBLISH, storedClient.getRqNum(),storedClient);
-        sendMessageToServer(publishOutgoingMessage);
-        Message incoming = getMessageFromServer(clientSocket,storedClient);
-
-        switch (incoming.getAction()){
-            case PUBLISHED:
-                System.out.println("Publish successful.");
-                break;
-            case PUBLISH_DENIED:
-                storedClient.getFiles().remove(filePath);
-                System.out.println(incoming.getAction() + " Request Number: " + storedClient.getRqNum()+ " " + incoming.getReason());
-                break;
-        }
-    }
-
-    private static void removeFileFromServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
-//TODO
-        Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(),storedClient);
-        sendMessageToServer(removeOutgoingMessage);
-        Message incoming = getMessageFromServer(clientSocket,storedClient);
-        switch (incoming.getAction()){
-            case REMOVED:
-                break;
-            case REMOVED_DENIED:
-                break;
-        }
-    }
-
-    /**
-     * @author Sunil
      * @return The users input
+     * @author Sunil
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
         return scanner.nextLine();
-    }
-
-    /**
-     * @author Sunil
-     */
-    private static void printOptions(){
-        System.out.println("Select an Option: ");
-        System.out.println("1. Register");
-        System.out.println("2. Publish");
-        System.out.println("3. Update");
-        System.out.println("4. File transfer between clients");
-        System.out.println("5. Update contact information");
     }
 
 

@@ -17,7 +17,7 @@ public class ServerTwoPointOh {
         listenForUDP();
     }
 
-    public static void listenForUDP(){
+    public static void listenForUDP() {
         System.out.println("Enter the server port you wish to start to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
 
@@ -25,24 +25,10 @@ public class ServerTwoPointOh {
             serverSocket = new DatagramSocket(SERVER_PORT);
             byte[] buffer = new byte[5000];
 
-            System.out.println("Listening for client connections on server port: "+SERVER_PORT);
-
-            //Receives initial connection message
-            DatagramPacket request = new DatagramPacket(buffer, buffer.length);
-            serverSocket.receive(request);
-            String connectionMessage = new String(request.getData(), 0, request.getLength());
-            System.out.println(connectionMessage);
-
-            // Send response to client
-            String messageToSend = "Connection successful. Proceed with registration";
-            InetAddress clientAddress = request.getAddress();
-            int clientPort = request.getPort();
-            byte[] sendData = messageToSend.getBytes();
-            DatagramPacket response = new DatagramPacket(sendData, sendData.length, clientAddress, clientPort);
-            serverSocket.send(response);
+            System.out.println("Listening for client connections on server port: " + SERVER_PORT);
 
             // Listen for incoming UDP packets
-            while(true) {
+            while (true) {
                 // Receive incoming UDP packet
                 Message receivedMessage = receiveMessageFromClient(serverSocket);
                 handleMessage(receivedMessage, serverSocket);
@@ -58,8 +44,8 @@ public class ServerTwoPointOh {
     }
 
     /**
-     * @author Sunil
      * @return The users input
+     * @author Sunil
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
@@ -76,7 +62,7 @@ public class ServerTwoPointOh {
         //receives the data and casts it to a Message object
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
         ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-        return (Message)objectInputStream.readObject();
+        return (Message) objectInputStream.readObject();
     }
 
 //    public static void listenForUDP() {
@@ -106,38 +92,40 @@ public class ServerTwoPointOh {
     /**
      * This method receives the message that is being sent by the client
      * Decides what method to execute
+     *
      * @throws IOException
      * @throws ClassNotFoundException
      */
-    private static void handleMessage(Message receivedMessage,DatagramSocket socket) throws IOException, ClassNotFoundException {
+    private static void handleMessage(Message receivedMessage, DatagramSocket socket) throws IOException, ClassNotFoundException {
         //This statement chooses what action to do depending on the action sent
-            switch (receivedMessage.getAction()){
-                case REGISTER :
-                    handleRegistration(receivedMessage,socket);
-                    break;
-                case DE_REGISTER :
-                    handleDeregistration(receivedMessage,socket);
-                    break;
-                case PUBLISH:
-                    handlePublish(receivedMessage,socket);
-                    break;
-                case REMOVE:
-                    break;
-            }
+        switch (receivedMessage.getAction()) {
+            case REGISTER:
+                handleRegistration(receivedMessage, socket);
+                break;
+            case DE_REGISTER:
+                handleDeregistration(receivedMessage, socket);
+                break;
+            case PUBLISH:
+                handlePublish(receivedMessage, socket);
+                break;
+            case REMOVE:
+                break;
+        }
     }
 
     /**
      * This method is handles when the user is trying to Register
+     *
      * @param incoming this is the message that is being sent from the client
      * @throws IOException
      */
-    private static void handleRegistration(Message incoming,DatagramSocket socket) throws IOException {
+    private static void handleRegistration(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
-        Message outgoingMessage = checkIfClientExists( clientInfo);
+        Message outgoingMessage = checkIfClientExists(clientInfo);
         System.out.println(incoming);
         System.out.println(outgoingMessage);
 
-        if(outgoingMessage.getAction() == Status.REGISTERED){
+        if (outgoingMessage.getAction() == Status.REGISTERED) {
             clients.add(clientInfo);
             registeredClients++;
             System.out.println("ADDED");
@@ -148,56 +136,58 @@ public class ServerTwoPointOh {
 
     /**
      * This method handles it when the user wants to deregister
+     *
      * @param incoming the user that is trying to leave
-     * @param socket the socket so that we can close it
+     * @param socket   the socket so that we can close it
      * @throws IOException
      */
-    private static void handleDeregistration(Message incoming,DatagramSocket socket) throws IOException {
+    private static void handleDeregistration(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo deregisteringClient = incoming.getClientInfo();
-        for (int i =0; i < clients.size();i++) {
+        for (int i = 0; i < clients.size(); i++) {
             ClientInfo currentClient = clients.get(i);
-            if(currentClient.getName().equalsIgnoreCase(deregisteringClient.getName())){
+            if (currentClient.getName().equalsIgnoreCase(deregisteringClient.getName())) {
                 clients.remove(i);
                 registeredClients--;
                 break;
             }
         }
 
-        Message outgoing = new Message(Status.DE_REGISTER,incoming.getRqNumber(),"Request granted");
-        sendMessageToClient(deregisteringClient,socket,outgoing);
+        Message outgoing = new Message(Status.DE_REGISTER, incoming.getRqNumber(), "Request granted");
+        sendMessageToClient(deregisteringClient, socket, outgoing);
 //        socket.close();
     }
 
-    private static void handlePublish(Message incoming,DatagramSocket socket) throws IOException {
+    private static void handlePublish(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         System.out.println(incoming);
         // update the user in the list "clients"
         Message outgoingMessage = checkIfFileExists(clientInfo);
 
-        if(outgoingMessage.getAction() == Status.PUBLISHED){
+        if (outgoingMessage.getAction() == Status.PUBLISHED) {
             ClientInfo searchedClient = clientInfo;
             //If the file is approved, update the client being stored in the clients list
+            // TODO(alex): INEFFICIENCY_COMMENT: This is a very inefficient way to update the list of files for a user (O(n) complexity) (this is a very bad practice) (this can be done in O(1) complexity by using a hashmap or a better data structure using the name as the key)
             for (int i = 0; i < clients.size(); i++) {
-                if(clients.get(i).getName().equalsIgnoreCase(searchedClient.getName())){
+                if (clients.get(i).getName().equalsIgnoreCase(searchedClient.getName())) {
                     // Instead of modifying the list of files for the searched user, Just replace the whole user
                     // with the updated field
-                    clients.set(i,searchedClient);
+                    clients.set(i, searchedClient);
                 }
             }
         }
-        sendMessageToClient(clientInfo,socket,outgoingMessage);
+        sendMessageToClient(clientInfo, socket, outgoingMessage);
     }
 
     /**
      * Anytime something happens on the server, the server must update all the registered clients with an UDPATE message
      * containing the list of currently registered clients and the files currently proposed to share
-     *
+     * <p>
      * TODO(sunil): this method must be called after every action that changes the list of clients or the list of files and if no action like that occurs, then at max 5 minutes after its last call
      */
     private static void handleUpdate() throws IOException {
-        Message messageToSend = new Message(Status.UPDATE,0);
+        Message messageToSend = new Message(Status.UPDATE, 0);
         messageToSend.setListOfClientsForUpdate(clients);
-        for(ClientInfo client : clients){
+        for (ClientInfo client : clients) {
             // Send an update message to all clients
             sendMessageToClient(client, serverSocket, new Message(Status.UPDATE, client.getRqNum()));
         }
@@ -214,7 +204,7 @@ public class ServerTwoPointOh {
         objectOutputStream.writeObject(outgoingMessage);
         objectOutputStream.flush();
 
-        byte [] messageToSend = byteArrayOutputStream.toByteArray();
+        byte[] messageToSend = byteArrayOutputStream.toByteArray();
 
         DatagramPacket response = new DatagramPacket(messageToSend, messageToSend.length, clientAddress, clientPort);
         socket.send(response);
@@ -223,35 +213,36 @@ public class ServerTwoPointOh {
     /**
      * This method checks if the client exists by looping through
      * and checking if the username exists
+     *
      * @param client the client that is being registered
      * @return a message to relay back to the client on their status of their Registration
      */
-    private static Message checkIfClientExists(ClientInfo client){
+    private static Message checkIfClientExists(ClientInfo client) {
         //This prepares the outgoing message to be registered if
         // everything goes fine in the for loop
-        Message outgoing = new Message(Status.REGISTERED,client.getRqNum());
+        Message outgoing = new Message(Status.REGISTERED, client.getRqNum());
 
-        for (ClientInfo c :clients) {
-            if(c.getName().equalsIgnoreCase(client.getName())){
+        for (ClientInfo c : clients) {
+            if (c.getName().equalsIgnoreCase(client.getName())) {
                 //This means that the user already exists, and we have to return a
                 //registration denied
-                outgoing = new Message(Status.REGISTER_DENIED,client.getRqNum(),"This username is taken");
+                outgoing = new Message(Status.REGISTER_DENIED, client.getRqNum(), "This username is taken");
             }
         }
         return outgoing;
     }
 
-    private static Message checkIfFileExists(ClientInfo client){
-        String newFile = client.getFiles().get(client.getFiles().size() -1 );
+    private static Message checkIfFileExists(ClientInfo client) {
+        String newFile = client.getFiles().get(client.getFiles().size() - 1);
         //Gets the last file in the file list
 
-        Message outgoing = new Message(Status.PUBLISHED,client.getRqNum());
+        Message outgoing = new Message(Status.PUBLISHED, client.getRqNum());
         //If the file is not there, we will return this message, if not the foreach loop will change it
 
-        for(ClientInfo selectedClient : clients){
-            if(selectedClient.getName().equalsIgnoreCase(client.getName())){ // Finds specific user by looping all the users
-                if(selectedClient.getFiles().contains(newFile))
-                    outgoing = new Message(Status.PUBLISH_DENIED,client.getRqNum(),"This file already exists in your list");
+        for (ClientInfo selectedClient : clients) {
+            if (selectedClient.getName().equalsIgnoreCase(client.getName())) { // Finds specific user by looping all the users
+                if (selectedClient.getFiles().contains(newFile))
+                    outgoing = new Message(Status.PUBLISH_DENIED, client.getRqNum(), "This file already exists in your list");
             }
         }
         return outgoing;
