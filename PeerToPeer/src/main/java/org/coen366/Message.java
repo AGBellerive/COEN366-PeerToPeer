@@ -1,6 +1,7 @@
 package org.coen366;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * This class will be the core of the communication
@@ -28,6 +29,8 @@ public class Message implements Serializable {
     private String reason;
 
     private ClientInfo clientInfo;
+
+    private List<ClientInfo> listOfClientsForUpdate;
 
     /**
      * For a new user to register, they must send a message
@@ -80,6 +83,14 @@ public class Message implements Serializable {
 
     public ClientInfo getClientInfo() {
         return clientInfo;
+    }
+
+    public List<ClientInfo> getListOfClientsForUpdate() {
+        return listOfClientsForUpdate;
+    }
+
+    public void setListOfClientsForUpdate(List<ClientInfo> listOfClientsForUpdate) {
+        this.listOfClientsForUpdate = listOfClientsForUpdate;
     }
 
     public void incrementRqNumber(){
