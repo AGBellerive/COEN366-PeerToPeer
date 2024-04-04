@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-public class ServerTwoPointOh {
+public class Server {
     private static int SERVER_PORT = 3000;
     private static int registeredClients = 0; // Initialize the variable
     private static List<ClientInfo> clients = new ArrayList<>();

@@ -7,7 +7,7 @@ import java.util.Scanner;
 
 import static java.lang.System.exit;
 
-public class ClientTwoPointOh {
+public class Client {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
@@ -108,7 +108,7 @@ public class ClientTwoPointOh {
                 switch (input) {
                     case 1:
                         synchronized (lock) {
-                            registerWithServer(ClientTwoPointOh.clientSocket);
+                            registerWithServer(Client.clientSocket);
                             lock.notify();
                         }
                         break;
