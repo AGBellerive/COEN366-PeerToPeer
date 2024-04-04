@@ -319,35 +319,47 @@ public class ClientTwoPointOh {
     private void requestFile(InetAddress IPAddressPeer, String fileName  ){
         try{
             //send file request to peer FILE-REQ | RQ# | File-name
-            //string for now will change depending on how we will receive the message
-            String message = "FILE-REQ" + "|" + Client.getRqNum() + "|" + fileName;
+
+            //get current client by using a new client object in the function
+            ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(),CLIENT_PORT);
+
+            //message object
+            Message reqMessage =  new Message(Status.FILE_REQ,Client.getRqNum(), fileName);
 
             //convert message into byte to send UDP
-            byte[] transferInfo = message.getBytes();
+            //object into byte array, just used to store the serialized message
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            //serialize it
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+
+            objectOutputStream.writeObject(reqMessage);
+            objectOutputStream.flush(); //to make sure the data is immediately sent over
+
+            byte[] transferInfo = byteArrayOutputStream.toByteArray();
 
             //to send the packet (Lab 2, slide 20...)
-            DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, SERVER_PORT);
+            DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, CLIENT_PORT);
             clientSocket.send(sendPacket);
 
             //Get answer from peer
             byte[] receiveData = new byte[1024];
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             clientSocket.receive(receivePacket);
-            //convert to string
-            String response = new String(receivePacket.getData(),0,receivePacket.getLength());
 
-            //confirmed or not
-            //again will depend how we send the message
-            //FILE-CONF | RQ# | TCP socket#
-            if (response.startsWith("FILE-CONF")){
-                String[] seperateInfo = response.split("|");
-                int tcpSocket = Integer.parseInt(seperateInfo[2]);//3rd index (TCP socket#)
-                transferFile(IPAddressPeer, tcpSocket, fileName);//still need to implement
+            //deserialize
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(receivePacket.getData());
+            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+            Message responseMessage = (Message) objectInputStream.readObject();
+
+            // Check if the response confirms the file transfer
+            if (responseMessage.getAction() == Status.FILE_CONF) {
+                int tcpSocket = Integer.parseInt(responseMessage.getReason()); // TCP socket number
+                transferFile(IPAddressPeer, tcpSocket, fileName);
             } else {
-                System.out.println("file does not exist at destination or cannot transfer now");
+                System.out.println("File does not exist at destination or cannot transfer now");
             }
 
-        } catch (IOException e){
+        } catch (IOException | ClassNotFoundException e){
             e.printStackTrace();
         }
     }
