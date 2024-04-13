@@ -26,12 +26,7 @@ public class Client {
         System.out.println("Enter the server port you wish to connect to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
 
-        System.out.println("Enter the server address: ");
-        try {
-            serverAddress = InetAddress.getByName(getUserInput());
-        } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        }
+        getServerAddress();
 
         System.out.println("Enter the port you wish to use as the client: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
@@ -53,7 +48,6 @@ public class Client {
             throw new RuntimeException(e);
         }
 
-
         // one thread for sending messages to the server
         ClientSender clientSender = new ClientSender();
         Thread clientThread = new Thread(clientSender);
@@ -63,6 +57,22 @@ public class Client {
         ClientReceiver clientReceiver = new ClientReceiver();
         Thread clientReceiverThread = new Thread(clientReceiver);
         clientReceiverThread.start();
+    }
+
+    /**
+     * This method gets the server address from the user
+     * Currently, it is set to localhost for testing purposes
+     * The commented out code is for when the user is asked for the server address
+     */
+    private static void getServerAddress() {
+//        System.out.println("Enter the server address: ");
+        try {
+//            serverAddress = InetAddress.getByName(getUserInput());
+        serverAddress = InetAddress.getLocalHost(); // for testing purposes
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     /**
