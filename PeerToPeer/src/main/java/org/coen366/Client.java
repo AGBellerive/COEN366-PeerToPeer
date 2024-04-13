@@ -124,7 +124,7 @@ public class Client {
 
                 switch (input) {
                     case "1":
-                        registerWithServer(Client.clientSocket);
+                        registerWithServer();
                         break;
                     case "2":
                         deregisterWithServer();
@@ -140,18 +140,20 @@ public class Client {
         /**
          * This method deals with any registration the user does
          *
-         * @param clientSocket the current connection
          * @return the clientInfo and stores it into a static field
          * @throws IOException
          * @throws ClassNotFoundException
          * @author Alex
          */
-        private static void registerWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException, InterruptedException {
-            System.out.println("Enter your name");
-            String name = getUserInput();
+        private static void registerWithServer() throws IOException, ClassNotFoundException, InterruptedException {
+            if(storedClient.getName() == null || storedClient.getName().isEmpty()) {
+                System.out.println("Enter your name");
+                String name = getUserInput();
 
-            // Creates a client with the entered name
-            storedClient.setName(name);
+                // Creates a client with the entered name
+                storedClient.setName(name);
+            }
+
             Message outgoingRegister = new Message(Status.REGISTER, storedClient.getRqNum(), storedClient);
 
             //Sends a message to the server, in this case, it sends a register message
