@@ -31,7 +31,9 @@ public class Server {
 
             reinitTimer();
 
-            System.out.println("Listening for client connections on server port: " + SERVER_PORT);
+            InetAddress address = InetAddress.getLocalHost();
+
+            System.out.println("Listening for client connections at: "+address+":" + SERVER_PORT);
 
             // Listen for incoming UDP packets
             while (true) {

@@ -9,6 +9,7 @@ import java.util.Scanner;
 import static java.lang.System.exit;
 
 public class Client {
+    private static  InetAddress serverAddress;
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
@@ -24,6 +25,13 @@ public class Client {
 
         System.out.println("Enter the server port you wish to connect to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
+
+        System.out.println("Enter the server address: ");
+        try {
+            serverAddress = InetAddress.getByName(getUserInput());
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
 
         System.out.println("Enter the port you wish to use as the client: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
@@ -356,7 +364,6 @@ public class Client {
         byte[] sendMessage = byteArrayOutputStream.toByteArray();
 
         //Sends message to server
-        InetAddress serverAddress = InetAddress.getByName("localhost");
         DatagramPacket sendPacket = new DatagramPacket(sendMessage, sendMessage.length, serverAddress, SERVER_PORT);
         clientSocket.send(sendPacket);
     }
