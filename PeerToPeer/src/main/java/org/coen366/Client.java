@@ -15,9 +15,6 @@ public class Client {
 
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
-
-    private static InetAddress clientAddress;
-
     private static String currentFilePathToPublish;
 
     private static final Object lock = new Object();
@@ -29,10 +26,30 @@ public class Client {
         System.out.println("Enter the port you wish to use as the client: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
 
+        //Connects to the port specified by the user
+
+        try {
+            clientSocket = new DatagramSocket(CLIENT_PORT);
+            // clientSocket.setSoTimeout(10000); // 10 second timeout (verify if we need to timeout or not)(note: when we timeout, the program crashes after the timeout is reached)
+
+            InetAddress clientAddress = InetAddress.getLocalHost();
+            storedClient = new ClientInfo("", clientAddress, CLIENT_PORT);
+        } catch (SocketException | UnknownHostException e) {
+            System.out.println("The connection has an error. Exiting...main");
+            if (clientSocket != null) {
+                clientSocket.close();
+            }
+            exit(0);
+            throw new RuntimeException(e);
+        }
+
+
+        // one thread for sending messages to the server
         ClientSender clientSender = new ClientSender();
         Thread clientThread = new Thread(clientSender);
         clientThread.start();
 
+        // one thread for receiving messages from the server
         ClientReceiver clientReceiver = new ClientReceiver();
         Thread clientReceiverThread = new Thread(clientReceiver);
         clientReceiverThread.start();
@@ -45,12 +62,6 @@ public class Client {
         @Override
         public void run() {
             try {
-                //Connects to the port specified by the user
-                clientSocket = new DatagramSocket(CLIENT_PORT);
-//                clientSocket.setSoTimeout(10000); // 10 second timeout (verify if we need to timeout or not)(note: when we timeout, the program crashes after the timeout is reached)
-                clientAddress = InetAddress.getLocalHost();
-
-
                 while (true) {
                     printOptions();
                     String input = getUserInput();
@@ -66,7 +77,7 @@ public class Client {
                     }
                 }
             } catch (IOException | ClassNotFoundException | InterruptedException e) {
-                System.out.println("The connection has an error. Exiting...");
+                System.out.println("The connection has an error. Exiting...sender");
                 exit(0);
                 throw new RuntimeException(e);
             } finally {
@@ -87,7 +98,6 @@ public class Client {
             System.out.println("3. Update");
             System.out.println("4. File transfer between clients");
             System.out.println("5. Update contact information");
-            System.out.println("6. Wait to receive a message");
         }
 
         /**
@@ -103,21 +113,16 @@ public class Client {
                 System.out.println("1. REGISTER");
                 System.out.println("2. DE_REGISTER");
                 System.out.println("3. Return");
-                int input = Integer.parseInt(getUserInput());
+                String input = getUserInput();
 
                 switch (input) {
-                    case 1:
-                            registerWithServer(Client.clientSocket);
+                    case "1":
+                        registerWithServer(Client.clientSocket);
                         break;
-                    case 2:
-                        if (storedClient != null) {
-                            deregisterWithServer();
-                            return;
-                        } else {
-                            System.out.println("You have not registered. Returning to main menu");
-                        }
-                        break;
-                    case 3:
+                    case "2":
+                        deregisterWithServer();
+                        return;
+                    case "3":
                         return;
                     default:
                         System.out.println("Invalid option");
@@ -138,8 +143,8 @@ public class Client {
             System.out.println("Enter your name");
             String name = getUserInput();
 
-            //Creates a client with the entered name and with their ipaddress
-            storedClient = new ClientInfo(name, clientAddress, CLIENT_PORT);
+            // Creates a client with the entered name
+            storedClient.setName(name);
             Message outgoingRegister = new Message(Status.REGISTER, storedClient.getRqNum(), storedClient);
 
             //Sends a message to the server, in this case, it sends a register message
@@ -167,25 +172,28 @@ public class Client {
          * @throws InterruptedException
          */
         private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
-            if (storedClient == null) {
+   /*         if (storedClient == null) {
                 System.out.println("You must register first before publishing");
                 Thread.sleep(1000);
                 return;
-            }
+            }*/
             while (true) {
                 System.out.println("Select a Publishing Option");
                 System.out.println("1. PUBLISH");
                 System.out.println("2. REMOVE");
-                int input = Integer.parseInt(getUserInput());
+                System.out.println("3. Return");
+                String input = getUserInput();
 
                 switch (input) {
-                    case 1:
+                    case "1":
                         publishFileToServer();
                         break;
-                    case 2:
+                    case "2":
                         System.out.println("Not implemented yet relax");
                         //removeFileFromServer();
                         break;
+                    case "3":
+                        return;
                     default:
                         System.out.println("Invalid Option");
                 }
@@ -235,14 +243,12 @@ public class Client {
         public void run() {
             try {
                 while (true) {
-                        while (storedClient == null) {
-                            // don't do anything
-                        }
-                        Message receivedMessage = getMessageFromServer(storedClient);
-                        handleMessage(receivedMessage);
-                    }
+                    Message receivedMessage = getMessageFromServer();
+                    handleMessage(receivedMessage);
+                }
             } catch (IOException | ClassNotFoundException | InterruptedException e) {
-                System.out.println("The connection has an error. Exiting...");
+                System.out.println("The connection has an error. Exiting...receiver");
+                System.out.println(e.getMessage());
                 exit(0);
                 throw new RuntimeException(e);
             } finally {
@@ -264,7 +270,6 @@ public class Client {
                     exit(0);
                 case REGISTER_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
-                    storedClient = null; // set it back to null since it failed
                     break;
                 case PUBLISHED:
                     System.out.println("Publish successful.");
@@ -297,13 +302,12 @@ public class Client {
         /**
          * This method receives the message back from the server
          *
-         * @param client
          * @return the message sent from the server
          * @throws IOException
          * @throws ClassNotFoundException
          * @author Alex & Sunil
          */
-        private static Message getMessageFromServer(ClientInfo client) throws IOException, ClassNotFoundException {
+        private static Message getMessageFromServer() throws IOException, ClassNotFoundException {
             //Prepares the space for the message to be stored in
             byte[] buffer = new byte[5000];
 
@@ -315,7 +319,7 @@ public class Client {
             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
             //Increments the rqNum because a rqNum is associated to a specific message
-            client.incrementRqNum();
+            storedClient.incrementRqNum();
 
             //converts the buffer into a Message object
             return (Message) objectInputStream.readObject();
@@ -353,21 +357,25 @@ public class Client {
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
-        return scanner.nextLine();
+        String input;
+        do {
+            input = scanner.nextLine();
+        } while (input == null || input.isEmpty());
+        return input;
     }
 
 
     //2.4 File transfer between clients (peers)
     //File request
-    private void requestFile(InetAddress IPAddressPeer, String fileName  ){
-        try{
+    private void requestFile(InetAddress IPAddressPeer, String fileName) {
+        try {
             //send file request to peer FILE-REQ | RQ# | File-name
 
             //get current client by using a new client object in the function
-            ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(),CLIENT_PORT);
+            ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(), CLIENT_PORT);
 
             //message object
-            Message reqMessage =  new Message(Status.FILE_REQ,clientInfo.getRqNum(), fileName);
+            Message reqMessage = new Message(Status.FILE_REQ, clientInfo.getRqNum(), fileName);
 
             //convert message into byte to send UDP
             //object into byte array, just used to store the serialized message
@@ -402,7 +410,7 @@ public class Client {
                 System.out.println("File does not exist at destination or cannot transfer now");
             }
 
-        } catch (IOException | ClassNotFoundException e){
+        } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
@@ -410,9 +418,8 @@ public class Client {
     //File confirmation
 
 
-
     //File transfer
-    private void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName){
+    private void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName) {
 
     }
 

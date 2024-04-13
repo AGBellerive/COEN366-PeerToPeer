@@ -122,8 +122,8 @@ public class Server {
     private static void handleRegistration(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         Message outgoingMessage = checkIfClientExists(clientInfo);
-        System.out.println(incoming);
-        System.out.println(outgoingMessage);
+        System.out.println("INCOMING: "+incoming);
+        System.out.println("OUTGOING: "+outgoingMessage);
 
         if (outgoingMessage.getAction() == Status.REGISTERED) {
             clients.add(clientInfo);
@@ -136,12 +136,14 @@ public class Server {
 
     /**
      * This method handles it when the user wants to deregister
+     * even if the user is not registered, the server will still send a message back
      *
      * @param incoming the user that is trying to leave
      * @param socket   the socket so that we can close it
      * @throws IOException
      */
     private static void handleDeregistration(Message incoming, DatagramSocket socket) throws IOException {
+        System.out.println("INCOMING: "+incoming);
         ClientInfo deregisteringClient = incoming.getClientInfo();
         for (int i = 0; i < clients.size(); i++) {
             ClientInfo currentClient = clients.get(i);
