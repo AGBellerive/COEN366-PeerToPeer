@@ -12,29 +12,14 @@ public class Server {
     private static DatagramSocket serverSocket = null;
 
     // 1 second * 60 = 1 minute; 1 minute * 5 = 5 minutes
-    private static final long UPDATE_TIME = 1000*60*5;
+    private static final long UPDATE_TIME = 1000 * 60 * 5;
 
     private static Timer timer = new Timer();
-    private static final TimerTask updateTask = new TimerTask() {
 
-        @Override
-        public void run() {
-            try {
-                handleUpdate();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    };
 
     public static void main(String[] args) {
         listenForUDP();
-
-
-
     }
-
-
 
     public static void listenForUDP() {
         System.out.println("Enter the server port you wish to start to:");
@@ -44,8 +29,7 @@ public class Server {
             serverSocket = new DatagramSocket(SERVER_PORT);
             byte[] buffer = new byte[5000];
 
-            timer.schedule(updateTask, 0, UPDATE_TIME);
-//            timer.cancel();
+            reinitTimer();
 
             System.out.println("Listening for client connections on server port: " + SERVER_PORT);
 
@@ -144,8 +128,8 @@ public class Server {
     private static void handleRegistration(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         Message outgoingMessage = checkIfClientExists(clientInfo);
-        System.out.println("INCOMING: "+incoming);
-        System.out.println("OUTGOING: "+outgoingMessage);
+        System.out.println("INCOMING: " + incoming);
+        System.out.println("OUTGOING: " + outgoingMessage);
 
         if (outgoingMessage.getAction() == Status.REGISTERED) {
             clients.add(clientInfo);
@@ -165,7 +149,7 @@ public class Server {
      * @throws IOException
      */
     private static void handleDeregistration(Message incoming, DatagramSocket socket) throws IOException {
-        System.out.println("INCOMING: "+incoming);
+        System.out.println("INCOMING: " + incoming);
         ClientInfo deregisteringClient = incoming.getClientInfo();
         for (int i = 0; i < clients.size(); i++) {
             ClientInfo currentClient = clients.get(i);
