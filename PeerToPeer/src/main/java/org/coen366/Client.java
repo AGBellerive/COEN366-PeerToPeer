@@ -107,10 +107,7 @@ public class Client {
 
                 switch (input) {
                     case 1:
-                        synchronized (lock) {
                             registerWithServer(Client.clientSocket);
-                            lock.notify();
-                        }
                         break;
                     case 2:
                         if (storedClient != null) {
@@ -238,14 +235,12 @@ public class Client {
         public void run() {
             try {
                 while (true) {
-                    synchronized (lock) {
                         while (storedClient == null) {
-                            lock.wait();
+                            // don't do anything
                         }
                         Message receivedMessage = getMessageFromServer(storedClient);
                         handleMessage(receivedMessage);
                     }
-                }
             } catch (IOException | ClassNotFoundException | InterruptedException e) {
                 System.out.println("The connection has an error. Exiting...");
                 exit(0);
@@ -372,7 +367,7 @@ public class Client {
             ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(),CLIENT_PORT);
 
             //message object
-            Message reqMessage =  new Message(Status.FILE_REQ,Client.getRqNum(), fileName);
+            Message reqMessage =  new Message(Status.FILE_REQ,clientInfo.getRqNum(), fileName);
 
             //convert message into byte to send UDP
             //object into byte array, just used to store the serialized message
