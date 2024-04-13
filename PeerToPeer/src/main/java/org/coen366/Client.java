@@ -2,6 +2,7 @@ package org.coen366;
 
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
@@ -11,7 +12,7 @@ public class Client {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private List<ClientInfo> listOfClientInformations;
+    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<ClientInfo>();
 
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
@@ -20,6 +21,7 @@ public class Client {
     private static final Object lock = new Object();
 
     public static void main(String[] args) {
+
         System.out.println("Enter the server port you wish to connect to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
 
@@ -72,6 +74,11 @@ public class Client {
                         case "2":
                             printPublishingOptions();
                             break;
+                        case "6":
+                            for(ClientInfo clientInfo : listOfClientInformationsFromServer){
+                                System.out.println(clientInfo);
+                            }
+                            break;
                         default:
                             System.out.println("Invalid option");
                     }
@@ -95,9 +102,9 @@ public class Client {
             System.out.println("Select an Option: ");
             System.out.println("1. Register");
             System.out.println("2. Publish");
-            System.out.println("3. Update");
-            System.out.println("4. File transfer between clients");
-            System.out.println("5. Update contact information");
+            System.out.println("3. File transfer between clients");
+            System.out.println("4. Update contact information");
+            System.out.println("6. View all clients (for testing if receives clientInfo from server updates)"); // for testing purposes (to see if the client is receiving the list of clients)
         }
 
         /**
@@ -283,6 +290,8 @@ public class Client {
                 case REMOVED_DENIED:
                     break;
                 case UPDATE:
+                    System.out.println("Received an update from the server");
+                    listOfClientInformationsFromServer = receivedMessage.getListOfClientsInfosForUpdate();
                     break;
                 case FILE_REQ:
                     break;
