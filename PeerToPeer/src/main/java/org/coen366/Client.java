@@ -372,7 +372,7 @@ public class Client {
             ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(),CLIENT_PORT);
 
             //message object
-            Message reqMessage =  new Message(Status.FILE_REQ,Client.getRqNum(), fileName);
+            Message reqMessage =  new Message(Status.FILE_REQ,clientInfo.getRqNum(), fileName);
 
             //convert message into byte to send UDP
             //object into byte array, just used to store the serialized message
