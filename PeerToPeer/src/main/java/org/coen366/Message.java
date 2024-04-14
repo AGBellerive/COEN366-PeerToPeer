@@ -32,6 +32,8 @@ public class Message implements Serializable {
 
     private List<ClientInfo> listOfClientsForUpdate;
 
+    private String file;
+
     /**
      * For a new user to register, they must send a message
      * through udp with the fields
@@ -55,6 +57,13 @@ public class Message implements Serializable {
     public Message(Status action,int rqNumber){
         this.action = action;
         this.rqNumber = rqNumber;
+    }
+
+    public Message(Status action, int rqNumber,ClientInfo clientInfo,String file) {
+        this.action = action;
+        this.rqNumber = rqNumber;
+        this.clientInfo = clientInfo;
+        this.file = file;
     }
 
     public Status getAction() {
@@ -93,9 +102,10 @@ public class Message implements Serializable {
         this.listOfClientsForUpdate = listOfClientsForUpdate;
     }
 
-    public void incrementRqNumber(){
-        this.rqNumber++;
+    public String getFile() {
+        return file;
     }
+
     @Override
     public String toString() {
         return "Message{" +
@@ -103,6 +113,7 @@ public class Message implements Serializable {
                 ", rqNumber=" + rqNumber +
                 ", clientInfo=" + clientInfo +
                 ", reason='" + reason + '\'' +
+                ", file='"+file+'\''+
                 '}';
     }
 }

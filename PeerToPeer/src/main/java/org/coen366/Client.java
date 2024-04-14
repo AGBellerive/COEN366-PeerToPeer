@@ -16,6 +16,7 @@ public class Client {
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
     private static String currentFilePathToPublish;
+    private static String currentFilePathToDelete;
 
     private static final Object lock = new Object();
 
@@ -64,7 +65,7 @@ public class Client {
             try {
                 while (true) {
                     printOptions();
-                    String input = getUserInput();
+                    String input = getUserInput().trim();
                     switch (input) {
                         case "1":
                             printRegisterOptions();
@@ -113,7 +114,7 @@ public class Client {
                 System.out.println("1. REGISTER");
                 System.out.println("2. DE_REGISTER");
                 System.out.println("3. Return");
-                String input = getUserInput();
+                String input = getUserInput().trim();
 
                 switch (input) {
                     case "1":
@@ -141,7 +142,7 @@ public class Client {
          */
         private static void registerWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException, InterruptedException {
             System.out.println("Enter your name");
-            String name = getUserInput();
+            String name = getUserInput().trim();
 
             // Creates a client with the entered name
             storedClient.setName(name);
@@ -182,15 +183,14 @@ public class Client {
                 System.out.println("1. PUBLISH");
                 System.out.println("2. REMOVE");
                 System.out.println("3. Return");
-                String input = getUserInput();
+                String input = getUserInput().trim();
 
                 switch (input) {
                     case "1":
                         publishFileToServer();
                         break;
                     case "2":
-                        System.out.println("Not implemented yet relax");
-                        //removeFileFromServer();
+                        removeFileFromServer();
                         break;
                     case "3":
                         return;
@@ -206,11 +206,10 @@ public class Client {
          * server so the server can retain it
          *
          * @throws IOException
-         * @throws ClassNotFoundException
          */
-        private static void publishFileToServer() throws IOException, ClassNotFoundException {
+        private static void publishFileToServer() throws IOException { // might take in multiple files to add
             System.out.println("Enter the file path you want to publish to the server");
-            currentFilePathToPublish = getUserInput();
+            currentFilePathToPublish = getUserInput().trim();
             File publishedFile = new File(currentFilePathToPublish);
 
             if (!(publishedFile.exists())) {
@@ -227,9 +226,13 @@ public class Client {
             sendMessageToServer(publishOutgoingMessage);
         }
 
-        private static void removeFileFromServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
-//TODO
-            Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient);
+        private static void removeFileFromServer() throws IOException { // Might take in multiple files to remove
+            //Ask for a list and comma seperated
+            System.out.println("Enter the file path you want to remove from the server");
+            currentFilePathToDelete = getUserInput().trim();
+
+            Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient,currentFilePathToDelete);
+
             sendMessageToServer(removeOutgoingMessage);
         }
 
@@ -279,8 +282,11 @@ public class Client {
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 case REMOVED:
+                    storedClient.getFiles().remove(currentFilePathToDelete);
+                    System.out.println("File Removed");
                     break;
                 case REMOVED_DENIED:
+                    System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 case UPDATE:
                     break;

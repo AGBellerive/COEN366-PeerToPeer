@@ -28,6 +28,6 @@ public enum Status {
     //2.5 Clients updating their contact information
     UPDATE_CONTACT,
     UPDATE_CONFIRMED,
-    UPDATE_DENIED
+    UPDATE_DENIED,
 
 }
