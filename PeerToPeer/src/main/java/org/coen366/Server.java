@@ -33,7 +33,7 @@ public class Server {
 
             InetAddress address = InetAddress.getLocalHost();
 
-            System.out.println("Listening for client connections at: "+address+":" + SERVER_PORT);
+            System.out.println("Listening for client connections at: " + address + ":" + SERVER_PORT);
 
             // Listen for incoming UDP packets
             while (true) {
@@ -139,7 +139,9 @@ public class Server {
             System.out.println("ADDED");
         }
         sendMessageToClient(clientInfo, socket, outgoingMessage);
-        handleUpdate();
+        if(outgoingMessage.getAction() == Status.REGISTERED) {
+            handleUpdate();
+        }
     }
 
     /**
@@ -200,8 +202,16 @@ public class Server {
         Message messageToSend = new Message(Status.UPDATE, 0);
         messageToSend.setListOfClientsInfosForUpdate(clients);
         for (ClientInfo client : clients) {
-            // Send an update message to all clients
-            sendMessageToClient(client, serverSocket, messageToSend);
+
+            Thread thread = new Thread(() -> {
+                try {
+                    // Send an update message to all clients
+                    sendMessageToClient(client, serverSocket, messageToSend);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
         }
         reinitTimer();
     }
