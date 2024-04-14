@@ -2,16 +2,18 @@ package org.coen366;
 
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
 import static java.lang.System.exit;
 
 public class Client {
+    private static  InetAddress serverAddress;
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private List<ClientInfo> listOfClientInformations;
+    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<ClientInfo>();
 
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
@@ -21,8 +23,11 @@ public class Client {
     private static final Object lock = new Object();
 
     public static void main(String[] args) {
+
         System.out.println("Enter the server port you wish to connect to:");
         SERVER_PORT = Integer.parseInt(getUserInput());
+
+        getServerAddress();
 
         System.out.println("Enter the port you wish to use as the client: ");
         CLIENT_PORT = Integer.parseInt(getUserInput());
@@ -44,7 +49,6 @@ public class Client {
             throw new RuntimeException(e);
         }
 
-
         // one thread for sending messages to the server
         ClientSender clientSender = new ClientSender();
         Thread clientThread = new Thread(clientSender);
@@ -54,6 +58,22 @@ public class Client {
         ClientReceiver clientReceiver = new ClientReceiver();
         Thread clientReceiverThread = new Thread(clientReceiver);
         clientReceiverThread.start();
+    }
+
+    /**
+     * This method gets the server address from the user
+     * Currently, it is set to localhost for testing purposes
+     * The commented out code is for when the user is asked for the server address
+     */
+    private static void getServerAddress() {
+//        System.out.println("Enter the server address: ");
+        try {
+//            serverAddress = InetAddress.getByName(getUserInput());
+        serverAddress = InetAddress.getLocalHost(); // for testing purposes
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     /**
@@ -72,6 +92,11 @@ public class Client {
                             break;
                         case "2":
                             printPublishingOptions();
+                            break;
+                        case "6":
+                            for(ClientInfo clientInfo : listOfClientInformationsFromServer){
+                                System.out.println(clientInfo);
+                            }
                             break;
                         default:
                             System.out.println("Invalid option");
@@ -96,9 +121,9 @@ public class Client {
             System.out.println("Select an Option: ");
             System.out.println("1. Register");
             System.out.println("2. Publish");
-            System.out.println("3. Update");
-            System.out.println("4. File transfer between clients");
-            System.out.println("5. Update contact information");
+            System.out.println("3. File transfer between clients");
+            System.out.println("4. Update contact information");
+            System.out.println("6. View all clients (for testing if receives clientInfo from server updates)"); // for testing purposes (to see if the client is receiving the list of clients)
         }
 
         /**
@@ -118,7 +143,7 @@ public class Client {
 
                 switch (input) {
                     case "1":
-                        registerWithServer(Client.clientSocket);
+                        registerWithServer();
                         break;
                     case "2":
                         deregisterWithServer();
@@ -134,18 +159,21 @@ public class Client {
         /**
          * This method deals with any registration the user does
          *
-         * @param clientSocket the current connection
          * @return the clientInfo and stores it into a static field
          * @throws IOException
          * @throws ClassNotFoundException
          * @author Alex
          */
-        private static void registerWithServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException, InterruptedException {
-            System.out.println("Enter your name");
-            String name = getUserInput().trim();
 
-            // Creates a client with the entered name
-            storedClient.setName(name);
+        private static void registerWithServer() throws IOException, ClassNotFoundException, InterruptedException {
+            if(storedClient.getName() == null || storedClient.getName().isEmpty()) {
+                System.out.println("Enter your name");
+                String name = getUserInput().trim();
+
+                // Creates a client with the entered name
+                storedClient.setName(name);
+            }
+
             Message outgoingRegister = new Message(Status.REGISTER, storedClient.getRqNum(), storedClient);
 
             //Sends a message to the server, in this case, it sends a register message
@@ -289,6 +317,8 @@ public class Client {
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 case UPDATE:
+                    System.out.println("Received an update from the server");
+                    listOfClientInformationsFromServer = receivedMessage.getListOfClientsInfosForUpdate();
                     break;
                 case FILE_REQ:
                     break;
@@ -351,7 +381,6 @@ public class Client {
         byte[] sendMessage = byteArrayOutputStream.toByteArray();
 
         //Sends message to server
-        InetAddress serverAddress = InetAddress.getByName("localhost");
         DatagramPacket sendPacket = new DatagramPacket(sendMessage, sendMessage.length, serverAddress, SERVER_PORT);
         clientSocket.send(sendPacket);
     }

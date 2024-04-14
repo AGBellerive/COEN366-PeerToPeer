@@ -2,11 +2,11 @@ package org.coen366;
 
 import java.io.*;
 import java.net.*;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
+import java.util.*;
 
 public class Server {
     private static int SERVER_PORT = 3000;
@@ -17,6 +17,12 @@ public class Server {
     private static List<String> files = new ArrayList<>();
 
     private static DatagramSocket serverSocket = null;
+
+    // 1 second * 60 = 1 minute; 1 minute * 5 = 5 minutes
+    private static final long UPDATE_TIME = 1000 * 60 * 5;
+
+    private static Timer timer = new Timer();
+
 
     public static void main(String[] args) {
         try {
@@ -37,7 +43,11 @@ public class Server {
             serverSocket = new DatagramSocket(SERVER_PORT);
             byte[] buffer = new byte[5000];
 
-            System.out.println("Listening for client connections on server port: " + SERVER_PORT);
+            reinitTimer();
+
+            InetAddress address = InetAddress.getLocalHost();
+
+            System.out.println("Listening for client connections at: " + address + ":" + SERVER_PORT);
 
             // Listen for incoming UDP packets
             while (true) {
@@ -148,7 +158,9 @@ public class Server {
         System.out.println("SERVER OUTGOING: "+outgoingMessage);
 
         sendMessageToClient(clientInfo, socket, outgoingMessage);
-        handleUpdate();
+        if(outgoingMessage.getAction() == Status.REGISTERED) {
+            handleUpdate();
+        }
     }
 
     /**
@@ -170,6 +182,7 @@ public class Server {
             Message outgoing = new Message(Status.DE_REGISTER, incoming.getRqNumber(), "Request granted");
 
             System.out.println("SERVER OUTGOING: "+ outgoing);
+            handleUpdate();
             sendMessageToClient(deregisteringClient, socket, outgoing);
         }
         else{
@@ -177,6 +190,7 @@ public class Server {
             //further action is taken by the server.
             System.out.println("Unregistered client tried to deregister");
         }
+//        socket.close();
     }
 
     private static void handlePublish(Message incoming, DatagramSocket socket) throws IOException {
@@ -213,7 +227,7 @@ public class Server {
 
         System.out.println("CLIENT INCOMING :" +incoming);
 
-        Message outgoingMessage = new Message(Status.REMOVED_DENIED,clientInfo.getRqNum(),"File does not exist");;
+        Message outgoingMessage = new Message(Status.REMOVED_DENIED,clientInfo.getRqNum(),"File does not exist in your list");;
         //If the file is not found in the loop, that means it does not exist, and we will return this message
 
         if(clientHashmap.containsKey(clientInfo.getName().toLowerCase())) {
@@ -242,12 +256,22 @@ public class Server {
      * TODO(sunil): this method must be called after every action that changes the list of clients or the list of files and if no action like that occurs, then at max 5 minutes after its last call
      */
     private static void handleUpdate() throws IOException {
+        System.out.println("Updating clients");
         Message messageToSend = new Message(Status.UPDATE, 0);
-        messageToSend.setListOfClientsForUpdate(clients);
+        messageToSend.setListOfClientsInfosForUpdate(clients);
         for (ClientInfo client : clients) {
-            // Send an update message to all clients
-            sendMessageToClient(client, serverSocket, new Message(Status.UPDATE, client.getRqNum()));
+
+            Thread thread = new Thread(() -> {
+                try {
+                    // Send an update message to all clients
+                    sendMessageToClient(client, serverSocket, messageToSend);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
         }
+        reinitTimer();
     }
 
     private static void sendMessageToClient(ClientInfo clientInfo, DatagramSocket socket, Message outgoingMessage) throws IOException {
@@ -307,8 +331,25 @@ public class Server {
         return outgoing;
     }
 
-    private static boolean fileSearch(String file){
+    /**
+     * This is used to reset the timer after an update has been sent
+     * This is to ensure that the server will only send an update at max every 5 minutes since the last update
+     */
+    private static void reinitTimer() {
+        TimerTask timerTask = new TimerTask() {
 
-        return false;
+            @Override
+            public void run() {
+                try {
+                    handleUpdate();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        timer.cancel();
+        timer = new Timer();
+        timer.schedule(timerTask, UPDATE_TIME, UPDATE_TIME);
     }
+
 }
