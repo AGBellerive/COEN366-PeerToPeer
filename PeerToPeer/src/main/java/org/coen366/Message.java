@@ -30,7 +30,7 @@ public class Message implements Serializable {
 
     private ClientInfo clientInfo;
 
-    private List<ClientInfo> listOfClientsForUpdate;
+    private List<ClientInfo> listOfClientsInfosForUpdate;
 
     /**
      * For a new user to register, they must send a message
@@ -85,12 +85,12 @@ public class Message implements Serializable {
         return clientInfo;
     }
 
-    public List<ClientInfo> getListOfClientsForUpdate() {
-        return listOfClientsForUpdate;
+    public List<ClientInfo> getListOfClientsInfosForUpdate() {
+        return listOfClientsInfosForUpdate;
     }
 
-    public void setListOfClientsForUpdate(List<ClientInfo> listOfClientsForUpdate) {
-        this.listOfClientsForUpdate = listOfClientsForUpdate;
+    public void setListOfClientsInfosForUpdate(List<ClientInfo> listOfClientsInfosForUpdate) {
+        this.listOfClientsInfosForUpdate = listOfClientsInfosForUpdate;
     }
 
     public void incrementRqNumber(){

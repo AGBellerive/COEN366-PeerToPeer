@@ -2,9 +2,7 @@ package org.coen366;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Server {
     private static int SERVER_PORT = 3000;
@@ -12,6 +10,12 @@ public class Server {
     private static List<ClientInfo> clients = new ArrayList<>();
 
     private static DatagramSocket serverSocket = null;
+
+    // 1 second * 60 = 1 minute; 1 minute * 5 = 5 minutes
+    private static final long UPDATE_TIME = 1000 * 60 * 5;
+
+    private static Timer timer = new Timer();
+
 
     public static void main(String[] args) {
         listenForUDP();
@@ -25,7 +29,11 @@ public class Server {
             serverSocket = new DatagramSocket(SERVER_PORT);
             byte[] buffer = new byte[5000];
 
-            System.out.println("Listening for client connections on server port: " + SERVER_PORT);
+            reinitTimer();
+
+            InetAddress address = InetAddress.getLocalHost();
+
+            System.out.println("Listening for client connections at: " + address + ":" + SERVER_PORT);
 
             // Listen for incoming UDP packets
             while (true) {
@@ -122,8 +130,8 @@ public class Server {
     private static void handleRegistration(Message incoming, DatagramSocket socket) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         Message outgoingMessage = checkIfClientExists(clientInfo);
-        System.out.println(incoming);
-        System.out.println(outgoingMessage);
+        System.out.println("INCOMING: " + incoming);
+        System.out.println("OUTGOING: " + outgoingMessage);
 
         if (outgoingMessage.getAction() == Status.REGISTERED) {
             clients.add(clientInfo);
@@ -131,17 +139,21 @@ public class Server {
             System.out.println("ADDED");
         }
         sendMessageToClient(clientInfo, socket, outgoingMessage);
-        handleUpdate();
+        if(outgoingMessage.getAction() == Status.REGISTERED) {
+            handleUpdate();
+        }
     }
 
     /**
      * This method handles it when the user wants to deregister
+     * even if the user is not registered, the server will still send a message back
      *
      * @param incoming the user that is trying to leave
      * @param socket   the socket so that we can close it
      * @throws IOException
      */
     private static void handleDeregistration(Message incoming, DatagramSocket socket) throws IOException {
+        System.out.println("INCOMING: " + incoming);
         ClientInfo deregisteringClient = incoming.getClientInfo();
         for (int i = 0; i < clients.size(); i++) {
             ClientInfo currentClient = clients.get(i);
@@ -154,6 +166,7 @@ public class Server {
 
         Message outgoing = new Message(Status.DE_REGISTER, incoming.getRqNumber(), "Request granted");
         sendMessageToClient(deregisteringClient, socket, outgoing);
+        handleUpdate();
 //        socket.close();
     }
 
@@ -185,12 +198,22 @@ public class Server {
      * TODO(sunil): this method must be called after every action that changes the list of clients or the list of files and if no action like that occurs, then at max 5 minutes after its last call
      */
     private static void handleUpdate() throws IOException {
+        System.out.println("Updating clients");
         Message messageToSend = new Message(Status.UPDATE, 0);
-        messageToSend.setListOfClientsForUpdate(clients);
+        messageToSend.setListOfClientsInfosForUpdate(clients);
         for (ClientInfo client : clients) {
-            // Send an update message to all clients
-            sendMessageToClient(client, serverSocket, new Message(Status.UPDATE, client.getRqNum()));
+
+            Thread thread = new Thread(() -> {
+                try {
+                    // Send an update message to all clients
+                    sendMessageToClient(client, serverSocket, messageToSend);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
         }
+        reinitTimer();
     }
 
     private static void sendMessageToClient(ClientInfo clientInfo, DatagramSocket socket, Message outgoingMessage) throws IOException {
@@ -247,4 +270,26 @@ public class Server {
         }
         return outgoing;
     }
+
+    /**
+     * This is used to reset the timer after an update has been sent
+     * This is to ensure that the server will only send an update at max every 5 minutes since the last update
+     */
+    private static void reinitTimer() {
+        TimerTask timerTask = new TimerTask() {
+
+            @Override
+            public void run() {
+                try {
+                    handleUpdate();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        timer.cancel();
+        timer = new Timer();
+        timer.schedule(timerTask, UPDATE_TIME, UPDATE_TIME);
+    }
+
 }
