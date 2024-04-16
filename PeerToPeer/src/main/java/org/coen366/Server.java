@@ -151,7 +151,7 @@ public class Server {
 
         Message outgoingMessage = checkIfClientExists(clientInfo);
 
-        if (outgoingMessage.getAction() == Status.REGISTERED) {
+        if (outgoingMessage.getAction() == Status.REGISTERED && outgoingMessage.getReason() == null) {
             clients.add(clientInfo);
             clientHashmap.put(clientInfo.getName(), clientInfo);
 
@@ -342,7 +342,14 @@ public class Server {
         Message outgoing = new Message(Status.REGISTERED, client.getRqNum());
 
         if (clientHashmap.containsKey(client.getName().toLowerCase())) {
-            outgoing = new Message(Status.REGISTER_DENIED, client.getRqNum(), "This username is taken");
+
+            // check if they're the same existing user
+            ClientInfo retrievedClient = clientHashmap.get(client.getName().toLowerCase());
+            if (retrievedClient.getIpAddress().equals(client.getIpAddress()) && retrievedClient.getClientPort() == client.getClientPort()) {
+                outgoing = new Message(Status.REGISTERED, client.getRqNum(), "The user has been reconnected");
+            } else {
+                outgoing = new Message(Status.REGISTER_DENIED, client.getRqNum(), "This username is taken");
+            }
         }
 
         return outgoing;

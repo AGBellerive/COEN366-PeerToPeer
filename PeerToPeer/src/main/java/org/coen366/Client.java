@@ -339,7 +339,11 @@ public class Client {
         private static void handleMessage(Message receivedMessage) throws IOException, InterruptedException {
             switch (receivedMessage.getAction()) {
                 case REGISTERED:
-                    System.out.println("Registration Successful");
+                    if(receivedMessage.getReason()!=null) {
+                        System.out.println("The user has been reconnected");
+                    } else {
+                        System.out.println("Registration Successful");
+                    }
                     break;
                 case DE_REGISTER:
                     System.out.println(receivedMessage);
