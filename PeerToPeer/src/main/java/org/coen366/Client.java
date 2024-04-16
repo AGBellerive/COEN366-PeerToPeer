@@ -92,10 +92,17 @@ public class Client {
                         case "2":
                             printPublishingOptions();
                             break;
+                        case "3":
+                            for(ClientInfo clientInfo : listOfClientInformationsFromServer){
+                                System.out.println(clientInfo);
+                            }
+                            fileRequestHandler();
+                            break;
                         case "6":
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
                                 System.out.println(clientInfo);
                             }
+
                             break;
                         default:
                             System.out.println("Invalid option");
@@ -394,16 +401,37 @@ public class Client {
 
 
     //2.4 File transfer between clients (peers)
-    //File request
-    private void requestFile(InetAddress IPAddressPeer, String fileName) {
+    //file request handler
+    private static void fileRequestHandler(){
+        Scanner scanner =new Scanner(System.in);
+        System.out.println("Enter IP address of desired peer: ");
+        String ipAddressPeer = scanner.nextLine();
+        //convert to InetAddress
+        InetAddress IPAddressPeer = null;
         try {
-            //send file request to peer FILE-REQ | RQ# | File-name
+            IPAddressPeer = InetAddress.getByName(ipAddressPeer);
+        } catch (UnknownHostException e){
+            e.printStackTrace();
+            return;
+        }
 
-            //get current client by using a new client object in the function
-            ClientInfo clientInfo = new ClientInfo("client", InetAddress.getLocalHost(), CLIENT_PORT);
+        System.out.println("Enter the peer's port number: ");
+        int peerPort = scanner.nextInt();
+
+        System.out.println("Enter the desire file name: ");
+        String fileName = scanner.nextLine();
+
+        requestFile(IPAddressPeer,fileName,peerPort);
+
+    }
+
+    //File request
+    // send file request to peer FILE-REQ | RQ# | File-name
+    private static void requestFile(InetAddress IPAddressPeer, String fileName, int peerPort) {
+        try {
 
             //message object
-            Message reqMessage = new Message(Status.FILE_REQ, clientInfo.getRqNum(), fileName);
+            Message reqMessage = new Message(Status.FILE_REQ, storedClient.getRqNum(), fileName);
 
             //convert message into byte to send UDP
             //object into byte array, just used to store the serialized message
@@ -416,9 +444,10 @@ public class Client {
 
             byte[] transferInfo = byteArrayOutputStream.toByteArray();
 
-            //to send the packet (Lab 2, slide 20...)
-            DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, CLIENT_PORT);
+            //to send the packet (Lab 2, slide 20...) UDP
+            DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, peerPort);
             clientSocket.send(sendPacket);
+
 
             //Get answer from peer
             byte[] receiveData = new byte[1024];
@@ -447,9 +476,56 @@ public class Client {
 
 
     //File transfer
-    private void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName) {
+    private static void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName) {
+        try {
+            // Connect to peer's TCP socket
+            Socket socket = new Socket(IPAddressPeer, tcpSocket);
+            System.out.println("Connected to peer on TCP socket: " + tcpSocket);
 
+            // Open streams for file transfer
+            BufferedReader fileReader = new BufferedReader(new FileReader(fileName));
+            PrintWriter outputStream = new PrintWriter(socket.getOutputStream(), true);
+
+            // Transfer the file in chunks of 200 characters
+            char[] buffer = new char[200];
+            int charsRead;
+            int chunkNumber = 0;
+            int clientRqNum = 1; // Temporary
+            while ((charsRead = fileReader.read(buffer)) != -1) {
+                chunkNumber++;
+                String text = new String(buffer, 0, charsRead);
+                Message fileMessage = new Message(Status.FILE, clientRqNum, fileName, chunkNumber, text);
+                // Serialize the message and send it
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+                objectOutputStream.writeObject(fileMessage);
+                objectOutputStream.flush();
+                byte[] sendMessage = byteArrayOutputStream.toByteArray();
+                outputStream.write(new String(sendMessage));
+                outputStream.flush();
+            }
+
+            // Send FILE_END
+            Message fileEndMessage = new Message(Status.FILE_END, clientRqNum, fileName, chunkNumber, "");
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+            objectOutputStream.writeObject(fileEndMessage);
+            objectOutputStream.flush();
+            byte[] sendMessage = byteArrayOutputStream.toByteArray();
+            outputStream.write(new String(sendMessage));
+            outputStream.flush();
+
+            System.out.println("File transfer complete");
+
+            // Close streams and socket
+            fileReader.close();
+            outputStream.close();
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
 
 }

@@ -57,6 +57,12 @@ public class Message implements Serializable {
         this.rqNumber = rqNumber;
     }
 
+    //need to initialize it
+    public Message(Status action, int rqNumber, String fileName, int chunkNumber, String text) {
+        this.action = action;
+        this.rqNumber = rqNumber;
+    }
+
     public Status getAction() {
         return action;
     }
