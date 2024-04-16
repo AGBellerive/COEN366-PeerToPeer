@@ -93,6 +93,9 @@ public class Client {
                         case "2":
                             printPublishingOptions();
                             break;
+                        case "4":
+                            updateContactInfo();
+                            break;
                         case "6":
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
                                 System.out.println(clientInfo);
@@ -264,6 +267,50 @@ public class Client {
             sendMessageToServer(removeOutgoingMessage);
         }
 
+        private static void updateContactInfo() throws IOException {
+            System.out.println("Which one to modify");
+            System.out.println("1. IP Address");
+            System.out.println("2. UDP Socket");
+            System.out.println("3. Both IP Address and UDP Socket");
+            System.out.println("4. Return");
+
+            String selection = getUserInput();
+            InetAddress ip = storedClient.getIpAddress();
+            int udpSocket = storedClient.getClientPort();
+            switch(selection) {
+                case "1":
+                    System.out.println("Enter the new IP Address");
+                    ip = InetAddress.getByName(getUserInput());
+                    break;
+                case "2":
+                    System.out.println("Enter the new UDP Socket");
+                    udpSocket = Integer.parseInt(getUserInput());
+                    break;
+                case "3":
+                    System.out.println("Enter the new IP Address");
+                    ip = InetAddress.getByName(getUserInput());
+
+                    System.out.println("Enter the new UDP Socket");
+                    udpSocket = Integer.parseInt(getUserInput());
+                    break;
+                case "4":
+                    return;
+                default:
+                    System.out.println("Invalid option");
+                    return;
+            }
+
+            Message messageToSend = new Message(Status.UPDATE_CONTACT, storedClient.getRqNum(), storedClient);
+            messageToSend.setNewClientPort(udpSocket);
+            messageToSend.setNewIPAddress(ip);
+
+            sendMessageToServer(messageToSend);
+
+
+
+        }
+
+
     }
 
     /**
@@ -326,7 +373,11 @@ public class Client {
                     break;
                 case FILE_END:
                     break;
+                case UPDATE_CONFIRMED:
+                    System.out.println("Update Confirmed");
+                    break;
                 case UPDATE_DENIED:
+                    System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 default:
                     System.out.println("Invalid option");
