@@ -11,10 +11,7 @@ import java.util.*;
 public class Server {
     private static int SERVER_PORT = 3000;
     private static int registeredClients = 0; // Initialize the variable
-    private static List<ClientInfo> clients = new ArrayList<>();
     private static HashMap<String,ClientInfo> clientHashmap = new HashMap<>();
-
-    private static List<String> files = new ArrayList<>();
 
     private static DatagramSocket serverSocket = null;
 
@@ -71,7 +68,11 @@ public class Server {
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
-        return scanner.nextLine();
+        String input;
+        do {
+            input = scanner.nextLine();
+        } while (input == null || input.isEmpty());
+        return input;
     }
 
     private static Message receiveMessageFromClient(DatagramSocket socket) throws IOException, ClassNotFoundException {
@@ -86,30 +87,6 @@ public class Server {
         ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
         return (Message) objectInputStream.readObject();
     }
-
-//    public static void listenForUDP() {
-//        ServerSocket serverSocket=null;
-//        try {
-//            while(true) {
-//                // Listen for incoming UDP packets
-//                System.out.println("Listening for client connections on server port: "+SERVER_PORT);
-//                //This creates a new connection at the specified server port
-//                serverSocket = new ServerSocket(SERVER_PORT);
-//                // Receive incoming UDP packet
-//                Socket clientSocket = serverSocket.accept();
-//
-//                System.out.println("Connection from the client "+clientSocket.getInetAddress().getHostAddress());
-//                SERVER_PORT++; // so if another client tries to connect, it will not crash the server
-//
-//                handleMessage(clientSocket);
-//            }
-//
-//        } catch (IOException | ClassNotFoundException e) {
-//            System.out.println("Socket is closed. Exiting");
-//            exit(0);
-//            throw new RuntimeException(e);
-//        }
-//    }
 
     /**
      * This method receives the message that is being sent by the client
@@ -149,18 +126,16 @@ public class Server {
         Message outgoingMessage = checkIfClientExists(clientInfo);
 
         if (outgoingMessage.getAction() == Status.REGISTERED) {
-            clients.add(clientInfo);
-            clientHashmap.put(clientInfo.getName(),clientInfo);
-
+            //clients.add(clientInfo);
+            clientHashmap.put(clientInfo.getName().toLowerCase(),clientInfo);
             registeredClients++;
+
             System.out.println("CLIENT ADDED");
+            handleUpdate();
         }
         System.out.println("SERVER OUTGOING: "+outgoingMessage);
 
         sendMessageToClient(clientInfo, socket, outgoingMessage);
-        if(outgoingMessage.getAction() == Status.REGISTERED) {
-            handleUpdate();
-        }
     }
 
     /**
@@ -177,12 +152,16 @@ public class Server {
 
         if(clientHashmap.containsKey(deregisteringClient.getName().toLowerCase()) && !deregisteringClient.getName().isBlank()){ // if the user exists
             clientHashmap.remove(deregisteringClient.getName().toLowerCase());
+
             registeredClients--;
+
             System.out.println("CLIENT REMOVED");
+
             Message outgoing = new Message(Status.DE_REGISTER, incoming.getRqNumber(), "Request granted");
 
             System.out.println("SERVER OUTGOING: "+ outgoing);
             handleUpdate();
+
             sendMessageToClient(deregisteringClient, socket, outgoing);
         }
         else{
@@ -190,7 +169,6 @@ public class Server {
             //further action is taken by the server.
             System.out.println("Unregistered client tried to deregister");
         }
-//        socket.close();
     }
 
     private static void handlePublish(Message incoming, DatagramSocket socket) throws IOException {
@@ -207,7 +185,9 @@ public class Server {
                 //If the file is approved, update the client being stored in the clients list
                 // update the user in the hashmap
                 clientHashmap.replace(clientInfo.getName().toLowerCase(),clientInfo);
+
                 System.out.println("NEW FILE ADDED");
+                handleUpdate();
             }
             //else the file exists in the users list, it has returned publish denied
             // and will send that message instead
@@ -228,15 +208,16 @@ public class Server {
         System.out.println("CLIENT INCOMING :" +incoming);
 
         Message outgoingMessage = new Message(Status.REMOVED_DENIED,clientInfo.getRqNum(),"File does not exist in your list");;
-        //If the file is not found in the loop, that means it does not exist, and we will return this message
+        //If the file is not found in the loop below, that means it does not exist, and we will return this message
 
         if(clientHashmap.containsKey(clientInfo.getName().toLowerCase())) {
             //Going to loop through the users files to verify that the file provided is real
-            for(String file : clientHashmap.get(clientInfo.getName()).getFiles()){
+            for(String file : clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles()){
                 if(file.contains(fileToRemove)){ // if it is real, we will remove it
-                    clientHashmap.get(clientInfo.getName()).getFiles().remove(fileToRemove);
+                    clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles().remove(fileToRemove);
                     outgoingMessage = new Message(Status.REMOVED,clientInfo.getRqNum());
                     System.out.println("FILE REMOVED");
+                    handleUpdate();
                     break;
                 }
             }
@@ -258,9 +239,12 @@ public class Server {
     private static void handleUpdate() throws IOException {
         System.out.println("Updating clients");
         Message messageToSend = new Message(Status.UPDATE, 0);
-        messageToSend.setListOfClientsInfosForUpdate(clients);
-        for (ClientInfo client : clients) {
 
+        List<ClientInfo> clients = new ArrayList<>(clientHashmap.values());
+        messageToSend.setListOfClientsInfosForUpdate(clients);
+
+        //https://sentry.io/answers/iterate-hashmap-java/
+        clientHashmap.forEach((key,client) ->{
             Thread thread = new Thread(() -> {
                 try {
                     // Send an update message to all clients
@@ -270,7 +254,7 @@ public class Server {
                 }
             });
             thread.start();
-        }
+        });
         reinitTimer();
     }
 
@@ -322,12 +306,6 @@ public class Server {
             outgoing = new Message(Status.PUBLISH_DENIED, client.getRqNum(), "This file already exists in your list");
         }
 
-//        for (ClientInfo selectedClient : clients) {
-//            if (selectedClient.getName().equalsIgnoreCase(client.getName())) { // Finds specific user by looping all the users
-//                if (selectedClient.getFiles().contains(newFile))
-//                    outgoing = new Message(Status.PUBLISH_DENIED, client.getRqNum(), "This file already exists in your list");
-//            }
-//        }
         return outgoing;
     }
 

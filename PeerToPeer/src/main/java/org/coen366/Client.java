@@ -13,7 +13,7 @@ public class Client {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<ClientInfo>();
+    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<>();
 
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
@@ -201,11 +201,6 @@ public class Client {
          * @throws InterruptedException
          */
         private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
-   /*         if (storedClient == null) {
-                System.out.println("You must register first before publishing");
-                Thread.sleep(1000);
-                return;
-            }*/
             while (true) {
                 System.out.println("Select a Publishing Option");
                 System.out.println("1. PUBLISH");
@@ -237,6 +232,7 @@ public class Client {
          */
         private static void publishFileToServer() throws IOException { // might take in multiple files to add
             System.out.println("Enter the file path you want to publish to the server");
+            System.out.println("Working directory is " + System.getProperty("user.dir"));
             currentFilePathToPublish = getUserInput().trim();
             File publishedFile = new File(currentFilePathToPublish);
 
@@ -301,6 +297,7 @@ public class Client {
                     exit(0);
                 case REGISTER_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient.setName("");
                     break;
                 case PUBLISHED:
                     System.out.println("Publish successful.");
