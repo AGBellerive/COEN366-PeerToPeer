@@ -4,12 +4,11 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Scanner;
 import java.util.*;
 
 public class Server {
-    private static int SERVER_PORT = 3000;
+    private static int SERVER_PORT;
     private static int registeredClients = 0; // Initialize the variable
     private static HashMap<String,ClientInfo> clientHashmap = new HashMap<>();
 
@@ -25,6 +24,21 @@ public class Server {
         try {
             InetAddress serverAddress = InetAddress.getLocalHost();
             System.out.println("The server address is "+serverAddress);
+
+            if (new File("backup.txt").exists()) {
+                // if it does exists, must parse that file into the client hashmap
+                System.out.println("Backup file found\nDo you want to restore from backup?(Yes/No)");
+                String response = getUserInput();
+                if(response.toLowerCase().contains("yes")) {
+                    restoreFromBackup();
+
+                    System.out.println("Server port found. Restoring server port...");
+                    restoreServerPort();
+                }
+                else{
+                    System.out.println("Backup file will not be restored");
+                }
+            }
             listenForUDP();
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
@@ -33,8 +47,11 @@ public class Server {
     }
 
     public static void listenForUDP() {
-        System.out.println("Enter the server port you wish to start to:");
-        SERVER_PORT = Integer.parseInt(getUserInput());
+        if(clientHashmap.isEmpty()){
+            System.out.println("Enter the server port you wish to start to:");
+            SERVER_PORT = Integer.parseInt(getUserInput());
+            saveServerPort();
+        }
 
         try {
             serverSocket = new DatagramSocket(SERVER_PORT);
@@ -240,8 +257,7 @@ public class Server {
         System.out.println("Updating clients");
         Message messageToSend = new Message(Status.UPDATE, 0);
 
-        List<ClientInfo> clients = new ArrayList<>(clientHashmap.values());
-        messageToSend.setListOfClientsInfosForUpdate(clients);
+        messageToSend.setListOfClientsInfosForUpdate(new ArrayList<>(clientHashmap.values()));
 
         //https://sentry.io/answers/iterate-hashmap-java/
         clientHashmap.forEach((key,client) ->{
@@ -256,6 +272,7 @@ public class Server {
             thread.start();
         });
         reinitTimer();
+        saveToBackup();
     }
 
     private static void sendMessageToClient(ClientInfo clientInfo, DatagramSocket socket, Message outgoingMessage) throws IOException {
@@ -328,6 +345,68 @@ public class Server {
         timer.cancel();
         timer = new Timer();
         timer.schedule(timerTask, UPDATE_TIME, UPDATE_TIME);
+    }
+
+    private static void restoreFromBackup(){
+        //This method will be used to restore the hashmap from the backup file
+       try{
+           FileInputStream fileInputStream = new FileInputStream("backup.txt");
+           ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+
+           clientHashmap = (HashMap<String, ClientInfo>) objectInputStream.readObject();
+
+           objectInputStream.close();
+           fileInputStream.close();
+       } catch (IOException | ClassNotFoundException e) {
+           e.printStackTrace();
+       }
+
+    }
+
+    private static void saveToBackup(){
+        //This method will be used to save the hashmap to a backup file
+        try{
+            FileOutputStream fileOutputStream = new FileOutputStream("backup.txt");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+
+            objectOutputStream.writeObject(clientHashmap);
+
+            objectOutputStream.close();
+            fileOutputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void saveServerPort(){
+        //This method will be used to save the server port to a backup file
+        try{
+            FileOutputStream fileOutputStream = new FileOutputStream("serverPort.txt");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+
+            objectOutputStream.writeObject(SERVER_PORT);
+
+            objectOutputStream.close();
+            fileOutputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void restoreServerPort(){
+        //This method will be used to restore the server port from the backup file
+       try{
+           FileInputStream fileInputStream = new FileInputStream("serverPort.txt");
+           ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+
+           SERVER_PORT = (int) objectInputStream.readObject();
+
+           objectInputStream.close();
+           fileInputStream.close();
+       } catch (IOException | ClassNotFoundException e) {
+           e.printStackTrace();
+       }
+
     }
 
 }
