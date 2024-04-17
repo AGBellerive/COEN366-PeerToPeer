@@ -17,7 +17,7 @@ public class Client {
 
     private static int CLIENT_PORT; // is set in code
     private static int SERVER_PORT; // is set in code
-    private static String currentFilePathToPublish;
+    private static ArrayList<String> validFilesToPublish;
     private static String currentFilePathToDelete;
 
     private static final Object lock = new Object();
@@ -239,30 +239,34 @@ public class Client {
 //            currentFilePathToPublish = getUserInput().trim();
 
             ArrayList<String> filesToPublish = new ArrayList<>(List.of(getUserInput().trim().split(",")));
+            validFilesToPublish = new ArrayList<>();
 
             for(String file : filesToPublish){
                 File publishedFile = new File(file);
 
                 if (!(publishedFile.exists())) {
                     System.out.println("The file '" + file +"' is not found.");
-                    filesToPublish.remove(file);
                 }
                 else{
                     System.out.println("File found.");
+                    validFilesToPublish.add(file);
                     storedClient.addToFiles(file);
                 }
             }
 
             //In stored client, there is a list that contains all the files that the user has. This has to be Extracted and stored on the server side
-            if(!filesToPublish.isEmpty()){
+            if(!validFilesToPublish.isEmpty()){
                 Message publishOutgoingMessage = new Message(Status.PUBLISH, storedClient.getRqNum(), storedClient);
                 sendMessageToServer(publishOutgoingMessage);
+            }
+            else{
+                System.out.println("No files to publish. Returning...");
             }
         }
 
         private static void removeFileFromServer() throws IOException { // Might take in multiple files to remove
             //Ask for a list and comma seperated
-            System.out.println("Enter the file path you want to remove from the server");
+            System.out.println("Enter the file paths you want to remove from the server. Use Commas to separate each file entry");
             currentFilePathToDelete = getUserInput().trim();
 
             Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient,currentFilePathToDelete);
@@ -365,15 +369,18 @@ public class Client {
                     storedClient.incrementRqNum();
                     break;
                 case PUBLISH_DENIED:
-                    //have a loop that will loop through the variable
-                    // files to publish and remove it from this list one by one if the server denies the request
-                    storedClient.getFiles().remove(currentFilePathToPublish);
+                    for(String file : validFilesToPublish){
+                        storedClient.getFiles().remove(file);
+                    }
+
+
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     storedClient.incrementRqNum();
                     break;
                 case REMOVED:
+                    //Have a similar loop here to remove the files from the stored client
                     storedClient.getFiles().remove(currentFilePathToDelete);
-                    System.out.println("File Removed");
+                    System.out.println("Valid Files Removed");
                     storedClient.incrementRqNum();
                     break;
                 case REMOVED_DENIED:
