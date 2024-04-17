@@ -32,13 +32,18 @@ public class Message implements Serializable {
 
     private List<ClientInfo> listOfClientsInfosForUpdate;
 
+    private String file;
+
+    private int chunkNum;
+    private String text;
+
     /**
      * For a new user to register, they must send a message
      * through udp with the fields
      * REGISTER RQ# Name IP Address UDP socket#
      * @param action will be the enum signifying the action that will be taken
      * @param rqNumber is the message id
-//     * @param client is the users data like name, socket, ipaddress
+    //     * @param client is the users data like name, socket, ipaddress
      */
     public Message(Status action, int rqNumber,ClientInfo clientInfo) {
         this.action = action;
@@ -57,11 +62,9 @@ public class Message implements Serializable {
         this.rqNumber = rqNumber;
     }
 
-    //need to initialize it
-    public Message(Status action, int rqNumber, String fileName, int chunkNumber, String text) {
-        this.action = action;
-        this.rqNumber = rqNumber;
+    public Message(Status status, int rqNum, ClientInfo storedClient, String currentFilePathToDelete) {
     }
+
 
     public Status getAction() {
         return action;
@@ -99,9 +102,10 @@ public class Message implements Serializable {
         this.listOfClientsInfosForUpdate = listOfClientsInfosForUpdate;
     }
 
-    public void incrementRqNumber(){
-        this.rqNumber++;
+    public String getFile() {
+        return file;
     }
+
     @Override
     public String toString() {
         return "Message{" +
@@ -109,6 +113,33 @@ public class Message implements Serializable {
                 ", rqNumber=" + rqNumber +
                 ", clientInfo=" + clientInfo +
                 ", reason='" + reason + '\'' +
+                ", file='"+file+'\''+
                 '}';
+    }
+
+    public Message(Status action, int rqNumber,String fileName, int chunkNumber, String text){
+        this.action = action;
+        this.rqNumber = rqNumber;
+        this.file= fileName;
+        this.chunkNum = chunkNumber;
+        this.text = text;
+
+    }
+
+
+    public int getChunkNum() {
+        return chunkNum;
+    }
+
+    public void setChunkNum(int chunkNum) {
+        this.chunkNum = chunkNum;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 }

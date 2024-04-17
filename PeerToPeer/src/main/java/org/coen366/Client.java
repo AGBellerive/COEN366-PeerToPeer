@@ -13,11 +13,12 @@ public class Client {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<ClientInfo>();
+    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<>();
 
     private static int CLIENT_PORT = 8080; // is set in code
     private static int SERVER_PORT = 3000; // is set in code
     private static String currentFilePathToPublish;
+    private static String currentFilePathToDelete;
 
     private static final Object lock = new Object();
 
@@ -84,7 +85,7 @@ public class Client {
             try {
                 while (true) {
                     printOptions();
-                    String input = getUserInput();
+                    String input = getUserInput().trim();
                     switch (input) {
                         case "1":
                             printRegisterOptions();
@@ -96,7 +97,7 @@ public class Client {
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
                                 System.out.println(clientInfo);
                             }
-                            fileRequestHandler();
+                            fileRequestInput();
                             break;
                         case "6":
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
@@ -145,7 +146,7 @@ public class Client {
                 System.out.println("1. REGISTER");
                 System.out.println("2. DE_REGISTER");
                 System.out.println("3. Return");
-                String input = getUserInput();
+                String input = getUserInput().trim();
 
                 switch (input) {
                     case "1":
@@ -170,10 +171,11 @@ public class Client {
          * @throws ClassNotFoundException
          * @author Alex
          */
+
         private static void registerWithServer() throws IOException, ClassNotFoundException, InterruptedException {
             if(storedClient.getName() == null || storedClient.getName().isEmpty()) {
                 System.out.println("Enter your name");
-                String name = getUserInput();
+                String name = getUserInput().trim();
 
                 // Creates a client with the entered name
                 storedClient.setName(name);
@@ -206,25 +208,19 @@ public class Client {
          * @throws InterruptedException
          */
         private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
-   /*         if (storedClient == null) {
-                System.out.println("You must register first before publishing");
-                Thread.sleep(1000);
-                return;
-            }*/
             while (true) {
                 System.out.println("Select a Publishing Option");
                 System.out.println("1. PUBLISH");
                 System.out.println("2. REMOVE");
                 System.out.println("3. Return");
-                String input = getUserInput();
+                String input = getUserInput().trim();
 
                 switch (input) {
                     case "1":
                         publishFileToServer();
                         break;
                     case "2":
-                        System.out.println("Not implemented yet relax");
-                        //removeFileFromServer();
+                        removeFileFromServer();
                         break;
                     case "3":
                         return;
@@ -240,11 +236,11 @@ public class Client {
          * server so the server can retain it
          *
          * @throws IOException
-         * @throws ClassNotFoundException
          */
-        private static void publishFileToServer() throws IOException, ClassNotFoundException {
+        private static void publishFileToServer() throws IOException { // might take in multiple files to add
             System.out.println("Enter the file path you want to publish to the server");
-            currentFilePathToPublish = getUserInput();
+            System.out.println("Working directory is " + System.getProperty("user.dir"));
+            currentFilePathToPublish = getUserInput().trim();
             File publishedFile = new File(currentFilePathToPublish);
 
             if (!(publishedFile.exists())) {
@@ -261,9 +257,13 @@ public class Client {
             sendMessageToServer(publishOutgoingMessage);
         }
 
-        private static void removeFileFromServer(DatagramSocket clientSocket) throws IOException, ClassNotFoundException {
-//TODO
-            Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient);
+        private static void removeFileFromServer() throws IOException { // Might take in multiple files to remove
+            //Ask for a list and comma seperated
+            System.out.println("Enter the file path you want to remove from the server");
+            currentFilePathToDelete = getUserInput().trim();
+
+            Message removeOutgoingMessage = new Message(Status.REMOVE, storedClient.getRqNum(), storedClient,currentFilePathToDelete);
+
             sendMessageToServer(removeOutgoingMessage);
         }
 
@@ -304,6 +304,7 @@ public class Client {
                     exit(0);
                 case REGISTER_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient.setName("");
                     break;
                 case PUBLISHED:
                     System.out.println("Publish successful.");
@@ -313,16 +314,26 @@ public class Client {
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 case REMOVED:
+                    storedClient.getFiles().remove(currentFilePathToDelete);
+                    System.out.println("File Removed");
                     break;
                 case REMOVED_DENIED:
+                    System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
                     break;
                 case UPDATE:
                     System.out.println("Received an update from the server");
                     listOfClientInformationsFromServer = receivedMessage.getListOfClientsInfosForUpdate();
                     break;
                 case FILE_REQ:
+
                     break;
                 case FILE_CONF:
+                    int tcpSocket = Integer.parseInt(receivedMessage.getReason());// TCP socket number
+                    String fileName = receivedMessage.getFile();
+                    //transferFile(IPAddressPeer, tcpSocket, fileName);
+                    break;
+                case FILE_ERROR:
+                    System.out.println("File does not exist at destination or cannot transfer now");
                     break;
                 case FILE_END:
                     break;
@@ -401,8 +412,10 @@ public class Client {
 
 
     //2.4 File transfer between clients (peers)
-    //file request handler
-    private static void fileRequestHandler(){
+
+
+    //file request input
+    private static void fileRequestInput(){
         Scanner scanner =new Scanner(System.in);
         System.out.println("Enter IP address of desired peer: ");
         String ipAddressPeer = scanner.nextLine();
@@ -426,7 +439,7 @@ public class Client {
     }
 
     //File request
-    // send file request to peer FILE-REQ | RQ# | File-name
+    //FILE-REQ | RQ# | File-name
     private static void requestFile(InetAddress IPAddressPeer, String fileName, int peerPort) {
         try {
 
@@ -448,34 +461,24 @@ public class Client {
             DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, peerPort);
             clientSocket.send(sendPacket);
 
-
-            //Get answer from peer
-            byte[] receiveData = new byte[1024];
-            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-            clientSocket.receive(receivePacket);
-
-            //deserialize
-            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(receivePacket.getData());
-            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-            Message responseMessage = (Message) objectInputStream.readObject();
-
-            // Check if the response confirms the file transfer
-            if (responseMessage.getAction() == Status.FILE_CONF) {
-                int tcpSocket = Integer.parseInt(responseMessage.getReason()); // TCP socket number
-                transferFile(IPAddressPeer, tcpSocket, fileName);
-            } else {
-                System.out.println("File does not exist at destination or cannot transfer now");
-            }
-
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    //File confirmation
+   //handle file request
+    private static void handleFileRequest(Message receivedMessage){
+
+    }
+
+    //check file existance
+
+
 
 
     //File transfer
+    //FILE | RQ# | File-Name | Chunk# | Text
+    //FILE-END | RQ# | File-Name | Chunk# | Text
     private static void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName) {
         try {
             // Connect to peer's TCP socket
@@ -494,7 +497,7 @@ public class Client {
             while ((charsRead = fileReader.read(buffer)) != -1) {
                 chunkNumber++;
                 String text = new String(buffer, 0, charsRead);
-                Message fileMessage = new Message(Status.FILE, clientRqNum, fileName, chunkNumber, text);
+                Message fileMessage = new Message(Status.FILE, storedClient.getRqNum(), fileName, chunkNumber, text);
                 // Serialize the message and send it
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
@@ -506,7 +509,7 @@ public class Client {
             }
 
             // Send FILE_END
-            Message fileEndMessage = new Message(Status.FILE_END, clientRqNum, fileName, chunkNumber, "");
+            Message fileEndMessage = new Message(Status.FILE_END, storedClient.getRqNum(), fileName, chunkNumber, "");
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
             objectOutputStream.writeObject(fileEndMessage);

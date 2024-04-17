@@ -1,0 +1,78 @@
+Lab1
+How to make threads (code included)
+Multithreading 
+Sending params to a thread 
+Fetching output from thread
+Syncronization, Mutex & Semaphores
+
+Lab2
+Timers 
+	**Can be used to time out server connection **
+	**Server must write every 5 minutes to file**
+Datagram Sockets & Streams
+UDP Socket Programming (Send & Recive data with client and server) 
+	**Client sending messge to the server to register**
+	**Server denying the client because name already exsists**
+	**Sending a message to all the clients saying update with the list of their own files that the server has**
+TCP Socket Programming
+
+Lab3
+Serialization of classes to be sent through Socket 
+UDP (p.20 send a message to server to start the thread )
+Multiple client handling 
+Blocking (Waiting for a messge)
+Thread Per Client
+
+
+
+Classes
+
+Client 
+	Must establish connection with server
+	Send information to server 
+	Must publish information 
+	
+Server 
+	Must register 
+	Must de-register 
+
+Packet (Serializable)✔(UDP) **UPDATE WOULD USE THE SAME STRUCTURE**
+	Status
+	RQ# (Client id)
+	Name
+	IpAddress
+	UDP Socket#
+	Reason
+
+ClientInfo (Serializable)
+	IpAddress
+	Name
+	List of files
+
+FileHandler (Serializable) (TCP)
+	Status
+	RQ# (Client id)
+	Filename
+	TCPSocket
+	Chunk#
+	Text
+	
+Status (enum) ✔
+	Regester
+	De-Regester
+	Register-Denied
+	Publish
+	Published 
+	Published-Denied
+	Remove
+	Removed
+	Remove-Denied
+	UPDATE
+	File-Req
+	File-Conf
+	File
+	File-End
+	File-Error
+	Update-Contact
+	Update-Confirmed
+	Update-Denied
