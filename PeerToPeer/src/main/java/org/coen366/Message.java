@@ -1,6 +1,7 @@
 package org.coen366;
 
 import java.io.Serializable;
+import java.net.InetAddress;
 import java.util.List;
 
 /**
@@ -36,6 +37,9 @@ public class Message implements Serializable {
 
     private int chunkNum;
     private String text;
+    private InetAddress newIPAddress;
+    private int newClientPort;
+
 
     /**
      * For a new user to register, they must send a message
@@ -106,6 +110,22 @@ public class Message implements Serializable {
         return file;
     }
 
+    public InetAddress getNewIPAddress() {
+        return newIPAddress;
+    }
+
+    public void setNewIPAddress(InetAddress newIPAddress) {
+        this.newIPAddress = newIPAddress;
+    }
+
+    public int getNewClientPort() {
+        return newClientPort;
+    }
+
+    public void setNewClientPort(int newClientPort) {
+        this.newClientPort = newClientPort;
+    }
+
     @Override
     public String toString() {
         return "Message{" +
@@ -114,6 +134,8 @@ public class Message implements Serializable {
                 ", clientInfo=" + clientInfo +
                 ", reason='" + reason + '\'' +
                 ", file='"+file+'\''+
+                ", newIPAddress='" + newIPAddress +'\''+
+                ", newClientPort='" + newClientPort +
                 '}';
     }
 
