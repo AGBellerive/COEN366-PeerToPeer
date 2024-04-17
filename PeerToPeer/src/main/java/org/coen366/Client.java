@@ -13,10 +13,10 @@ public class Client {
     private static DatagramSocket clientSocket;
     private static ClientInfo storedClient;
 
-    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<ClientInfo>();
+    private static List<ClientInfo> listOfClientInformationsFromServer = new ArrayList<>();
 
-    private static int CLIENT_PORT = 8080; // is set in code
-    private static int SERVER_PORT = 3000; // is set in code
+    private static int CLIENT_PORT; // is set in code
+    private static int SERVER_PORT; // is set in code
     private static String currentFilePathToPublish;
     private static String currentFilePathToDelete;
 
@@ -98,7 +98,7 @@ public class Client {
                             break;
                         case "6":
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
-                                System.out.println(clientInfo);
+                                System.out.println("Client Name: " + clientInfo.getName() + ", Files: " + clientInfo.getFiles() + ", IP address: " + clientInfo.getIpAddress() + ", Port :" + clientInfo.getClientPort());
                             }
                             break;
                         default:
@@ -193,7 +193,6 @@ public class Client {
         private static void deregisterWithServer() throws IOException, ClassNotFoundException {
             Message deRegisterOutgoingMessage = new Message(Status.DE_REGISTER, storedClient.getRqNum(), storedClient);
             sendMessageToServer(deRegisterOutgoingMessage);
-
         }
 
         /**
@@ -204,11 +203,6 @@ public class Client {
          * @throws InterruptedException
          */
         private static void printPublishingOptions() throws IOException, ClassNotFoundException, InterruptedException {
-   /*         if (storedClient == null) {
-                System.out.println("You must register first before publishing");
-                Thread.sleep(1000);
-                return;
-            }*/
             while (true) {
                 System.out.println("Select a Publishing Option");
                 System.out.println("1. PUBLISH");
@@ -221,6 +215,7 @@ public class Client {
                         publishFileToServer();
                         break;
                     case "2":
+                        System.out.println("Alex has not finished implementing this part to take in multiple files to remove.");
                         removeFileFromServer();
                         break;
                     case "3":
@@ -239,22 +234,30 @@ public class Client {
          * @throws IOException
          */
         private static void publishFileToServer() throws IOException { // might take in multiple files to add
-            System.out.println("Enter the file path you want to publish to the server");
-            currentFilePathToPublish = getUserInput().trim();
-            File publishedFile = new File(currentFilePathToPublish);
+            System.out.println("Enter the file paths you want to publish to the server. Use Commas to separate each file entry");
+            System.out.println("Working directory is " + System.getProperty("user.dir"));
+//            currentFilePathToPublish = getUserInput().trim();
 
-            if (!(publishedFile.exists())) {
-                //The file does not exist therefore must tell the user and return back to main
-                System.out.println("The file path you entered is not found. Try again. Rerouting you back...");
-                return;
+            ArrayList<String> filesToPublish = new ArrayList<>(List.of(getUserInput().trim().split(",")));
+
+            for(String file : filesToPublish){
+                File publishedFile = new File(file);
+
+                if (!(publishedFile.exists())) {
+                    System.out.println("The file '" + file +"' is not found.");
+                    filesToPublish.remove(file);
+                }
+                else{
+                    System.out.println("File found.");
+                    storedClient.addToFiles(file);
+                }
             }
 
-            System.out.println("File found.");
-            storedClient.addToFiles(currentFilePathToPublish);
-
             //In stored client, there is a list that contains all the files that the user has. This has to be Extracted and stored on the server side
-            Message publishOutgoingMessage = new Message(Status.PUBLISH, storedClient.getRqNum(), storedClient);
-            sendMessageToServer(publishOutgoingMessage);
+            if(!filesToPublish.isEmpty()){
+                Message publishOutgoingMessage = new Message(Status.PUBLISH, storedClient.getRqNum(), storedClient);
+                sendMessageToServer(publishOutgoingMessage);
+            }
         }
 
         private static void removeFileFromServer() throws IOException { // Might take in multiple files to remove
@@ -343,29 +346,39 @@ public class Client {
                         System.out.println("The user has been reconnected");
                     } else {
                         System.out.println("Registration Successful");
+                        storedClient.incrementRqNum(); //Increments the rqNum because a rqNum is associated to a specific message
                     }
                     break;
                 case DE_REGISTER:
                     System.out.println(receivedMessage);
                     System.out.println("Deregestration complete");
+                    storedClient.incrementRqNum();
                     clientSocket.close();
                     exit(0);
                 case REGISTER_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient.setName("");
+                    storedClient.incrementRqNum();
                     break;
                 case PUBLISHED:
                     System.out.println("Publish successful.");
+                    storedClient.incrementRqNum();
                     break;
                 case PUBLISH_DENIED:
+                    //have a loop that will loop through the variable
+                    // files to publish and remove it from this list one by one if the server denies the request
                     storedClient.getFiles().remove(currentFilePathToPublish);
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient.incrementRqNum();
                     break;
                 case REMOVED:
                     storedClient.getFiles().remove(currentFilePathToDelete);
                     System.out.println("File Removed");
+                    storedClient.incrementRqNum();
                     break;
                 case REMOVED_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
+                    storedClient.incrementRqNum();
                     break;
                 case UPDATE:
                     System.out.println("Received an update from the server");
@@ -378,7 +391,7 @@ public class Client {
                 case FILE_END:
                     break;
                 case UPDATE_CONFIRMED:
-                    System.out.println("Update Confirmed");
+                    System.out.println("Update Contact Information Confirmed");
                     break;
                 case UPDATE_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
@@ -408,9 +421,6 @@ public class Client {
 
             ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-
-            //Increments the rqNum because a rqNum is associated to a specific message
-            storedClient.incrementRqNum();
 
             //converts the buffer into a Message object
             return (Message) objectInputStream.readObject();

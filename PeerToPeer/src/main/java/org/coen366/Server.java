@@ -4,17 +4,14 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Scanner;
 import java.util.*;
 
 public class Server {
-    private static int SERVER_PORT = 3000;
+    private static int SERVER_PORT;
     private static int registeredClients = 0; // Initialize the variable
-    private static List<ClientInfo> clients = new ArrayList<>();
-    private static HashMap<String, ClientInfo> clientHashmap = new HashMap<>();
 
-    private static List<String> files = new ArrayList<>();
+    private static HashMap<String,ClientInfo> clientHashmap = new HashMap<>();
 
     private static DatagramSocket serverSocket = null;
 
@@ -27,7 +24,23 @@ public class Server {
     public static void main(String[] args) {
         try {
             InetAddress serverAddress = InetAddress.getLocalHost();
-            System.out.println("The server address is " + serverAddress);
+
+            System.out.println("The server address is "+serverAddress);
+
+            if (new File("backup.txt").exists()) {
+                // if it does exists, must parse that file into the client hashmap
+                System.out.println("Backup file found\nDo you want to restore from backup?(Yes/No)");
+                String response = getUserInput();
+                if(response.toLowerCase().contains("yes")) {
+                    restoreFromBackup();
+
+                    System.out.println("Server port found. Restoring server port...");
+                    restoreServerPort();
+                }
+                else{
+                    System.out.println("Backup file will not be restored");
+                }
+            }
             listenForUDP();
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
@@ -36,8 +49,11 @@ public class Server {
     }
 
     public static void listenForUDP() {
-        System.out.println("Enter the server port you wish to start to:");
-        SERVER_PORT = Integer.parseInt(getUserInput());
+        if(clientHashmap.isEmpty()){
+            System.out.println("Enter the server port you wish to start to:");
+            SERVER_PORT = Integer.parseInt(getUserInput());
+            saveServerPort();
+        }
 
         try {
             serverSocket = new DatagramSocket(SERVER_PORT);
@@ -71,7 +87,11 @@ public class Server {
      */
     private static String getUserInput() {
         Scanner scanner = new Scanner(System.in);
-        return scanner.nextLine();
+        String input;
+        do {
+            input = scanner.nextLine();
+        } while (input == null || input.isEmpty());
+        return input;
     }
 
     private static Message receiveMessageFromClient(DatagramSocket socket) throws IOException, ClassNotFoundException {
@@ -86,30 +106,6 @@ public class Server {
         ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
         return (Message) objectInputStream.readObject();
     }
-
-//    public static void listenForUDP() {
-//        ServerSocket serverSocket=null;
-//        try {
-//            while(true) {
-//                // Listen for incoming UDP packets
-//                System.out.println("Listening for client connections on server port: "+SERVER_PORT);
-//                //This creates a new connection at the specified server port
-//                serverSocket = new ServerSocket(SERVER_PORT);
-//                // Receive incoming UDP packet
-//                Socket clientSocket = serverSocket.accept();
-//
-//                System.out.println("Connection from the client "+clientSocket.getInetAddress().getHostAddress());
-//                SERVER_PORT++; // so if another client tries to connect, it will not crash the server
-//
-//                handleMessage(clientSocket);
-//            }
-//
-//        } catch (IOException | ClassNotFoundException e) {
-//            System.out.println("Socket is closed. Exiting");
-//            exit(0);
-//            throw new RuntimeException(e);
-//        }
-//    }
 
     /**
      * This method receives the message that is being sent by the client
@@ -152,18 +148,16 @@ public class Server {
         Message outgoingMessage = checkIfClientExists(clientInfo);
 
         if (outgoingMessage.getAction() == Status.REGISTERED && outgoingMessage.getReason() == null) {
-            clients.add(clientInfo);
-            clientHashmap.put(clientInfo.getName(), clientInfo);
-
+            clientHashmap.put(clientInfo.getName().toLowerCase(),clientInfo);
             registeredClients++;
             System.out.println("CLIENT ADDED");
+        }
+        if(outgoingMessage.getAction() == Status.REGISTERED){
+            handleUpdate();
         }
         System.out.println("SERVER OUTGOING: " + outgoingMessage);
 
         sendMessageToClient(clientInfo, socket, outgoingMessage);
-        if (outgoingMessage.getAction() == Status.REGISTERED) {
-            handleUpdate();
-        }
     }
 
     /**
@@ -180,19 +174,22 @@ public class Server {
 
         if (clientHashmap.containsKey(deregisteringClient.getName().toLowerCase()) && !deregisteringClient.getName().isBlank()) { // if the user exists
             clientHashmap.remove(deregisteringClient.getName().toLowerCase());
+
             registeredClients--;
+
             System.out.println("CLIENT REMOVED");
+
             Message outgoing = new Message(Status.DE_REGISTER, incoming.getRqNumber(), "Request granted");
 
             System.out.println("SERVER OUTGOING: " + outgoing);
             handleUpdate();
+
             sendMessageToClient(deregisteringClient, socket, outgoing);
         } else {
             //In case Name is not registered, for instance, the message is just ignored by the server. No
             //further action is taken by the server.
             System.out.println("Unregistered client tried to deregister");
         }
-//        socket.close();
     }
 
     private static void handlePublish(Message incoming, DatagramSocket socket) throws IOException {
@@ -209,7 +206,9 @@ public class Server {
                 //If the file is approved, update the client being stored in the clients list
                 // update the user in the hashmap
                 clientHashmap.replace(clientInfo.getName().toLowerCase(), clientInfo);
+
                 System.out.println("NEW FILE ADDED");
+                handleUpdate();
             }
             //else the file exists in the users list, it has returned publish denied
             // and will send that message instead
@@ -228,17 +227,19 @@ public class Server {
 
         System.out.println("CLIENT INCOMING :" + incoming);
 
-        Message outgoingMessage = new Message(Status.REMOVED_DENIED, clientInfo.getRqNum(), "File does not exist in your list");
-        ;
-        //If the file is not found in the loop, that means it does not exist, and we will return this message
+
+        Message outgoingMessage = new Message(Status.REMOVED_DENIED,clientInfo.getRqNum(),"File does not exist in your list");
+        //If the file is not found in the loop below, that means it does not exist, and we will return this message
 
         if (clientHashmap.containsKey(clientInfo.getName().toLowerCase())) {
             //Going to loop through the users files to verify that the file provided is real
-            for (String file : clientHashmap.get(clientInfo.getName()).getFiles()) {
-                if (file.contains(fileToRemove)) { // if it is real, we will remove it
-                    clientHashmap.get(clientInfo.getName()).getFiles().remove(fileToRemove);
-                    outgoingMessage = new Message(Status.REMOVED, clientInfo.getRqNum());
+
+            for(String file : clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles()){
+                if(file.contains(fileToRemove)){ // if it is real, we will remove it
+                    clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles().remove(fileToRemove);
+                    outgoingMessage = new Message(Status.REMOVED,clientInfo.getRqNum());
                     System.out.println("FILE REMOVED");
+                    handleUpdate();
                     break;
                 }
             }
@@ -259,9 +260,11 @@ public class Server {
     private static void handleUpdate() throws IOException {
         System.out.println("Updating clients");
         Message messageToSend = new Message(Status.UPDATE, 0);
-        messageToSend.setListOfClientsInfosForUpdate(clients);
-        for (ClientInfo client : clients) {
 
+        messageToSend.setListOfClientsInfosForUpdate(new ArrayList<>(clientHashmap.values()));
+
+        //https://sentry.io/answers/iterate-hashmap-java/
+        clientHashmap.forEach((key,client) ->{
             Thread thread = new Thread(() -> {
                 try {
                     // Send an update message to all clients
@@ -271,8 +274,9 @@ public class Server {
                 }
             });
             thread.start();
-        }
+        });
         reinitTimer();
+        saveToBackup();
     }
 
 
@@ -282,6 +286,7 @@ public class Server {
         int newClientPort = incoming.getNewClientPort();
 
         InetAddress oldIpAddress = incoming.getClientInfo().getIpAddress();
+        int oldClientPort = incoming.getClientInfo().getClientPort();
 
         System.out.println("CLIENT INCOMING: " + incoming);
 
@@ -295,13 +300,15 @@ public class Server {
             clientHashmap.replace(clientInfo.getName().toLowerCase(), clientInfo);
             System.out.println("CLIENT UPDATED");
 
-            clientInfo.setIpAddress(oldIpAddress); // set the old ip address back just for the message to send back to the correct address
+            // set the old ip address back just for the message to send back to the correct address
+            ClientInfo oldClient = new ClientInfo(clientInfo.getName(), oldIpAddress, oldClientPort);
 
             Message messageToSend = new Message(Status.UPDATE_CONFIRMED, incoming.getRqNumber());
             messageToSend.setNewClientPort(newClientPort);
             messageToSend.setNewIPAddress(newIPAddress);
 
-            sendMessageToClient(clientInfo, socket, messageToSend);
+            sendMessageToClient(oldClient, socket, messageToSend);
+            handleUpdate();
         } else {
             // no client found, deny the request
             System.out.println("CLIENT NOT FOUND. NAME DOES NOT EXIST");
@@ -367,12 +374,6 @@ public class Server {
             outgoing = new Message(Status.PUBLISH_DENIED, client.getRqNum(), "This file already exists in your list");
         }
 
-//        for (ClientInfo selectedClient : clients) {
-//            if (selectedClient.getName().equalsIgnoreCase(client.getName())) { // Finds specific user by looping all the users
-//                if (selectedClient.getFiles().contains(newFile))
-//                    outgoing = new Message(Status.PUBLISH_DENIED, client.getRqNum(), "This file already exists in your list");
-//            }
-//        }
         return outgoing;
     }
 
@@ -395,6 +396,68 @@ public class Server {
         timer.cancel();
         timer = new Timer();
         timer.schedule(timerTask, UPDATE_TIME, UPDATE_TIME);
+    }
+
+    private static void restoreFromBackup(){
+        //This method will be used to restore the hashmap from the backup file
+       try{
+           FileInputStream fileInputStream = new FileInputStream("backup.txt");
+           ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+
+           clientHashmap = (HashMap<String, ClientInfo>) objectInputStream.readObject();
+
+           objectInputStream.close();
+           fileInputStream.close();
+       } catch (IOException | ClassNotFoundException e) {
+           e.printStackTrace();
+       }
+
+    }
+
+    private static void saveToBackup(){
+        //This method will be used to save the hashmap to a backup file
+        try{
+            FileOutputStream fileOutputStream = new FileOutputStream("backup.txt");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+
+            objectOutputStream.writeObject(clientHashmap);
+
+            objectOutputStream.close();
+            fileOutputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void saveServerPort(){
+        //This method will be used to save the server port to a backup file
+        try{
+            FileOutputStream fileOutputStream = new FileOutputStream("serverPort.txt");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+
+            objectOutputStream.writeObject(SERVER_PORT);
+
+            objectOutputStream.close();
+            fileOutputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void restoreServerPort(){
+        //This method will be used to restore the server port from the backup file
+       try{
+           FileInputStream fileInputStream = new FileInputStream("serverPort.txt");
+           ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+
+           SERVER_PORT = (int) objectInputStream.readObject();
+
+           objectInputStream.close();
+           fileInputStream.close();
+       } catch (IOException | ClassNotFoundException e) {
+           e.printStackTrace();
+       }
+
     }
 
 }
