@@ -392,6 +392,7 @@ public class Client {
                     break;
                 case UPDATE_CONFIRMED:
                     System.out.println("Update Contact Information Confirmed");
+                    exit(0); // The user will have to restart the client with the new information to continue or make a new client
                     break;
                 case UPDATE_DENIED:
                     System.out.println(receivedMessage.getAction() + " Request Number: " + storedClient.getRqNum() + " " + receivedMessage.getReason());
