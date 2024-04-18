@@ -223,7 +223,7 @@ public class Server {
     private static void handleRemove(Message incoming, DatagramSocket socket) throws IOException {
         // might need to implement this split the file string into an array to take in multiple files to remove
         ClientInfo clientInfo = incoming.getClientInfo();
-        String fileToRemove = incoming.getFile();
+        ArrayList<String> filesToRemove = new ArrayList<>(List.of(incoming.getFile().trim().split(",")));
 
         System.out.println("CLIENT INCOMING :" + incoming);
 
@@ -234,14 +234,10 @@ public class Server {
         if (clientHashmap.containsKey(clientInfo.getName().toLowerCase())) {
             //Going to loop through the users files to verify that the file provided is real
 
-            for(String file : clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles()){
-                if(file.contains(fileToRemove)){ // if it is real, we will remove it
-                    clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles().remove(fileToRemove);
-                    outgoingMessage = new Message(Status.REMOVED,clientInfo.getRqNum());
-                    System.out.println("FILE REMOVED");
-                    handleUpdate();
-                    break;
-                }
+            if(clientHashmap.get(clientInfo.getName().toLowerCase()).getFiles().removeAll(filesToRemove)){
+                outgoingMessage = new Message(Status.REMOVED,clientInfo.getRqNum());
+                System.out.println("VALID FILES REMOVED");
+                handleUpdate();
             }
         } else {
             //The name is not found therefore it must be denied
