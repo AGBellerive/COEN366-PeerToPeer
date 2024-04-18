@@ -491,9 +491,8 @@ public class Client {
 
     //file request input
     private static void fileRequestInput(){
-        Scanner scanner =new Scanner(System.in);
         System.out.println("Enter IP address of desired peer: ");
-        String ipAddressPeer = scanner.nextLine();
+        String ipAddressPeer = getUserInput();
         //convert to InetAddress
         InetAddress IPAddressPeer = null;
         try {
@@ -504,11 +503,10 @@ public class Client {
         }
 
         System.out.println("Enter the peer's port number: ");
-        int peerPort = scanner.nextInt();
-        scanner.nextLine();
+        int peerPort = Integer.parseInt(getUserInput());
 
         System.out.println("Enter the desire file name: ");
-        String fileName = scanner.nextLine();
+        String fileName = getUserInput();
 
 
         System.out.println("Sending request");
