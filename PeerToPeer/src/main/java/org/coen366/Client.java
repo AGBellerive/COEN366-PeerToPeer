@@ -104,7 +104,7 @@ public class Client {
                         case "4":
                             updateContactInfo();
                             break;
-                        case "6":
+                        case "5":
                             for(ClientInfo clientInfo : listOfClientInformationsFromServer){
                                 System.out.println("Client Name: " + clientInfo.getName() + ", Files: " + clientInfo.getFiles() + ", IP address: " + clientInfo.getIpAddress() + ", Port :" + clientInfo.getClientPort());
                             }
@@ -135,7 +135,7 @@ public class Client {
             System.out.println("2. Publish");
             System.out.println("3. File transfer between clients");
             System.out.println("4. Update contact information");
-            System.out.println("6. View all clients (for testing if receives clientInfo from server updates)"); // for testing purposes (to see if the client is receiving the list of clients)
+            System.out.println("5. View all clients (for testing if receives clientInfo from server updates)"); // for testing purposes (to see if the client is receiving the list of clients)
         }
 
         /**
