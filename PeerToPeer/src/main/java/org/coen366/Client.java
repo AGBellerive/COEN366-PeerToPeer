@@ -68,10 +68,10 @@ public class Client {
      * The commented out code is for when the user is asked for the server address
      */
     private static void getServerAddress() {
-        System.out.println("Enter the server address: ");
+        //System.out.println("Enter the server address: ");
         try {
-            serverAddress = InetAddress.getByName(getUserInput());
-//            serverAddress = InetAddress.getLocalHost(); // for testing purposes
+            //serverAddress = InetAddress.getByName(getUserInput());
+            serverAddress = InetAddress.getLocalHost(); // for testing purposes
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }

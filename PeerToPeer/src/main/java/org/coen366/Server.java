@@ -68,8 +68,8 @@ public class Server {
             // Listen for incoming UDP packets
             while (true) {
                 // Receive incoming UDP packet
-                Message receivedMessage = receiveMessageFromClient(serverSocket);
-                handleMessage(receivedMessage, serverSocket);
+                Message receivedMessage = receiveMessageFromClient();
+                handleMessage(receivedMessage);
             }
 
         } catch (Exception e) {
@@ -94,12 +94,12 @@ public class Server {
         return input;
     }
 
-    private static Message receiveMessageFromClient(DatagramSocket socket) throws IOException, ClassNotFoundException {
+    private static Message receiveMessageFromClient() throws IOException, ClassNotFoundException {
         //Define 5000 bytes for the message to be stored
         byte[] buffer = new byte[5000];
 
         DatagramPacket request = new DatagramPacket(buffer, buffer.length);
-        socket.receive(request); //stores the received message in the buffer variable
+        serverSocket.receive(request); //stores the received message in the buffer variable
 
         //receives the data and casts it to a Message object
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
@@ -114,23 +114,23 @@ public class Server {
      * @throws IOException
      * @throws ClassNotFoundException
      */
-    private static void handleMessage(Message receivedMessage, DatagramSocket socket) throws IOException, ClassNotFoundException {
+    private static void handleMessage(Message receivedMessage) throws IOException, ClassNotFoundException {
         //This statement chooses what action to do depending on the action sent
         switch (receivedMessage.getAction()) {
             case REGISTER:
-                handleRegistration(receivedMessage, socket);
+                handleRegistration(receivedMessage);
                 break;
             case DE_REGISTER:
-                handleDeregistration(receivedMessage, socket);
+                handleDeregistration(receivedMessage);
                 break;
             case PUBLISH:
-                handlePublish(receivedMessage, socket);
+                handlePublish(receivedMessage);
                 break;
             case REMOVE:
-                handleRemove(receivedMessage, socket);
+                handleRemove(receivedMessage);
                 break;
             case UPDATE_CONTACT:
-                handleUpdateContact(receivedMessage, socket);
+                handleUpdateContact(receivedMessage);
                 break;
         }
     }
@@ -141,7 +141,7 @@ public class Server {
      * @param incoming this is the message that is being sent from the client
      * @throws IOException
      */
-    private static void handleRegistration(Message incoming, DatagramSocket socket) throws IOException {
+    private static void handleRegistration(Message incoming) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         System.out.println("CLIENT INCOMING: " + incoming);
 
@@ -157,7 +157,7 @@ public class Server {
         }
         System.out.println("SERVER OUTGOING: " + outgoingMessage);
 
-        sendMessageToClient(clientInfo, socket, outgoingMessage);
+        sendMessageToClient(clientInfo, outgoingMessage);
     }
 
     /**
@@ -165,10 +165,9 @@ public class Server {
      * even if the user is not registered, the server will still send a message back
      *
      * @param incoming the user that is trying to leave
-     * @param socket   the socket so that we can close it
      * @throws IOException
      */
-    private static void handleDeregistration(Message incoming, DatagramSocket socket) throws IOException {
+    private static void handleDeregistration(Message incoming) throws IOException {
         System.out.println("CLIENT INCOMING: " + incoming);
         ClientInfo deregisteringClient = incoming.getClientInfo();
 
@@ -184,7 +183,7 @@ public class Server {
             System.out.println("SERVER OUTGOING: " + outgoing);
             handleUpdate();
 
-            sendMessageToClient(deregisteringClient, socket, outgoing);
+            sendMessageToClient(deregisteringClient, outgoing);
         } else {
             //In case Name is not registered, for instance, the message is just ignored by the server. No
             //further action is taken by the server.
@@ -192,7 +191,7 @@ public class Server {
         }
     }
 
-    private static void handlePublish(Message incoming, DatagramSocket socket) throws IOException {
+    private static void handlePublish(Message incoming) throws IOException {
         ClientInfo clientInfo = incoming.getClientInfo();
         System.out.println("CLIENT INCOMING :" + incoming);
 
@@ -217,10 +216,10 @@ public class Server {
             outgoingMessage = new Message(Status.PUBLISH_DENIED, clientInfo.getRqNum(), "Name does not exist. You must register");
         }
         System.out.println("SERVER OUTGOING: " + outgoingMessage);
-        sendMessageToClient(clientInfo, socket, outgoingMessage);
+        sendMessageToClient(clientInfo, outgoingMessage);
     }
 
-    private static void handleRemove(Message incoming, DatagramSocket socket) throws IOException {
+    private static void handleRemove(Message incoming) throws IOException {
         // might need to implement this split the file string into an array to take in multiple files to remove
         ClientInfo clientInfo = incoming.getClientInfo();
         ArrayList<String> filesToRemove = new ArrayList<>(List.of(incoming.getFile().trim().split(",")));
@@ -244,7 +243,7 @@ public class Server {
             outgoingMessage = new Message(Status.REMOVED_DENIED, clientInfo.getRqNum(), "Name does not exist. You must register");
         }
         System.out.println("SERVER OUTGOING: " + outgoingMessage);
-        sendMessageToClient(clientInfo, socket, outgoingMessage);
+        sendMessageToClient(clientInfo, outgoingMessage);
     }
 
     /**
@@ -264,7 +263,7 @@ public class Server {
             Thread thread = new Thread(() -> {
                 try {
                     // Send an update message to all clients
-                    sendMessageToClient(client, serverSocket, messageToSend);
+                    sendMessageToClient(client, messageToSend);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -276,7 +275,7 @@ public class Server {
     }
 
 
-    private static void handleUpdateContact(Message incoming, DatagramSocket socket) throws IOException {
+    private static void handleUpdateContact(Message incoming) throws IOException {
         //This is the message that is being sent from the client
         InetAddress newIPAddress = incoming.getNewIPAddress();
         int newClientPort = incoming.getNewClientPort();
@@ -303,19 +302,19 @@ public class Server {
             messageToSend.setNewClientPort(newClientPort);
             messageToSend.setNewIPAddress(newIPAddress);
 
-            sendMessageToClient(oldClient, socket, messageToSend);
+            sendMessageToClient(oldClient, messageToSend);
             handleUpdate();
         } else {
             // no client found, deny the request
             System.out.println("CLIENT NOT FOUND. NAME DOES NOT EXIST");
 
             Message messageToSend = new Message(Status.UPDATE_DENIED, incoming.getRqNumber(), "Client not found. You must register first");
-            sendMessageToClient(clientInfo, socket, messageToSend);
+            sendMessageToClient(clientInfo, messageToSend);
         }
 
     }
 
-    private static void sendMessageToClient(ClientInfo clientInfo, DatagramSocket socket, Message outgoingMessage) throws IOException {
+    private static void sendMessageToClient(ClientInfo clientInfo, Message outgoingMessage) throws IOException {
         // Send response to client
         InetAddress clientAddress = clientInfo.getIpAddress();
 
@@ -329,7 +328,7 @@ public class Server {
         byte[] messageToSend = byteArrayOutputStream.toByteArray();
 
         DatagramPacket response = new DatagramPacket(messageToSend, messageToSend.length, clientAddress, clientPort);
-        socket.send(response);
+        serverSocket.send(response);
     }
 
     /**

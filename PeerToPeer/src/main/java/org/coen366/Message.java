@@ -82,6 +82,10 @@ public class Message implements Serializable {
 
 
     public Message(Status status, int rqNum, ClientInfo storedClient, String currentFilePathToDelete) {
+        this.action = status;
+        this.rqNumber = rqNum;
+        this.clientInfo = storedClient;
+        this.file = currentFilePathToDelete;
     }
 
     public Message(Status action, int rqNumber, int tcpSocketNum, InetAddress clientIPAddress) {
