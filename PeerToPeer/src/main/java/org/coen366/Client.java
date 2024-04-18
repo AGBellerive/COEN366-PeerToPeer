@@ -5,8 +5,10 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Random;
 
 import static java.lang.System.exit;
+import static java.lang.System.setOut;
 
 public class Client {
     private static  InetAddress serverAddress;
@@ -66,10 +68,10 @@ public class Client {
      * The commented out code is for when the user is asked for the server address
      */
     private static void getServerAddress() {
-//        System.out.println("Enter the server address: ");
+        System.out.println("Enter the server address: ");
         try {
-//            serverAddress = InetAddress.getByName(getUserInput());
-            serverAddress = InetAddress.getLocalHost(); // for testing purposes
+            serverAddress = InetAddress.getByName(getUserInput());
+//            serverAddress = InetAddress.getLocalHost(); // for testing purposes
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
@@ -98,6 +100,7 @@ public class Client {
                                 System.out.println(clientInfo);
                             }
                             fileRequestInput();
+                            break;
                         case "4":
                             updateContactInfo();
                             break;
@@ -391,18 +394,15 @@ public class Client {
                     listOfClientInformationsFromServer = receivedMessage.getListOfClientsInfosForUpdate();
                     break;
                 case FILE_REQ:
-
+                    handleFileRequest(receivedMessage);
                     break;
                 case FILE_CONF:
-                    int tcpSocket = Integer.parseInt(receivedMessage.getReason());// TCP socket number
-                    String fileName = receivedMessage.getFile();
-                    //transferFile(IPAddressPeer, tcpSocket, fileName);
+                    handleConfirm(receivedMessage);
                     break;
                 case FILE_ERROR:
                     System.out.println("File does not exist at destination or cannot transfer now");
                     break;
-                case FILE_END:
-                    break;
+
                 case UPDATE_CONFIRMED:
                     System.out.println("Update Contact Information Confirmed");
                     exit(0); // The user will have to restart the client with the new information to continue or make a new client
@@ -498,21 +498,22 @@ public class Client {
 
         System.out.println("Enter the peer's port number: ");
         int peerPort = scanner.nextInt();
+        scanner.nextLine();
 
         System.out.println("Enter the desire file name: ");
         String fileName = scanner.nextLine();
 
-        requestFile(IPAddressPeer,fileName,peerPort);
 
+        System.out.println("Sending request");
+        requestFile(IPAddressPeer,fileName,peerPort);
     }
 
     //File request
     //FILE-REQ | RQ# | File-name
     private static void requestFile(InetAddress IPAddressPeer, String fileName, int peerPort) {
         try {
-
             //message object
-            Message reqMessage = new Message(Status.FILE_REQ, storedClient.getRqNum(), fileName);
+            Message reqMessage = new Message(Status.FILE_REQ, storedClient.getRqNum(), fileName, storedClient);
 
             //convert message into byte to send UDP
             //object into byte array, just used to store the serialized message
@@ -529,71 +530,150 @@ public class Client {
             DatagramPacket sendPacket = new DatagramPacket(transferInfo, transferInfo.length, IPAddressPeer, peerPort);
             clientSocket.send(sendPacket);
 
+            System.out.println("Request sent");
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-   //handle file request
-    private static void handleFileRequest(Message receivedMessage){
+   //handle file request, check if file exists
+    private static void handleFileRequest(Message receivedMessage) throws IOException {
+        System.out.println("checking if file exists");
+        String fileName = receivedMessage.getFile();
+        InetAddress peerIP = receivedMessage.getClientInfo().getIpAddress();
+        int peerPort = receivedMessage.getClientInfo().getClientPort();
+
+
+       if (checkFileExist(fileName)){
+           System.out.println("File Found");
+           Random rand = new Random();
+           int tcpSocket = rand.nextInt(0, 65535); //tcp socket
+           Message message = new Message(Status.FILE_CONF, storedClient.getRqNum(), tcpSocket, storedClient.getIpAddress());
+           sendMessageToClient(message, peerIP,peerPort);
+           handleFileTransfer(fileName, tcpSocket,peerIP);//file transfer to start
+
+       }else{
+           Message failedMessage = new Message(Status.FILE_ERROR, storedClient.getRqNum(),"file not found");
+           sendMessageToClient(failedMessage, peerIP,peerPort);
+           System.out.println("File NOT Found");
+       }
 
     }
 
-    //check file existance
+    //check file existance function
+    private static boolean checkFileExist(String fileName){
+        File file = new File(fileName);
+        return file.exists();
+    }
 
+    //FILE_CONF
+    private static void handleConfirm(Message receivedMessage){
+        try{
+            int tcpSocketNum = receivedMessage.getTcpSocketNum();
+            InetAddress ipAddress = receivedMessage.getClientIPAddress();
+            Socket socket = new Socket(ipAddress, tcpSocketNum);
 
+            while(true) {
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                Message reading = (Message) in.readObject();
+                System.out.println(reading);
 
+                handleFile(reading);
+
+                if(reading.getAction() == Status.FILE_END){
+                    break;
+                }
+            }
+            // continue until FILE_END
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
 
     //File transfer
     //FILE | RQ# | File-Name | Chunk# | Text
     //FILE-END | RQ# | File-Name | Chunk# | Text
-    private static void transferFile(InetAddress IPAddressPeer, int tcpSocket, String fileName) {
-        try {
-            // Connect to peer's TCP socket
-            Socket socket = new Socket(IPAddressPeer, tcpSocket);
-            System.out.println("Connected to peer on TCP socket: " + tcpSocket);
+    //gets called at handleFileRequest
+    private static void handleFileTransfer(String fileName, int tcpSocket, InetAddress peerAddress) {
+        try (ServerSocket serverSocket = new ServerSocket(tcpSocket);
+             Socket socket = serverSocket.accept(); //accept tcp
+             BufferedReader fileReader = new BufferedReader(new FileReader(fileName));
+             ) {
+            System.out.println("Client connected");
 
-            // Open streams for file transfer
-            BufferedReader fileReader = new BufferedReader(new FileReader(fileName));
-            PrintWriter outputStream = new PrintWriter(socket.getOutputStream(), true);
-
-            // Transfer the file in chunks of 200 characters
             char[] buffer = new char[200];
             int charsRead;
             int chunkNumber = 0;
-            int clientRqNum = 1; // Temporary
+            int clientRqNum = storedClient.getRqNum();
+
             while ((charsRead = fileReader.read(buffer)) != -1) {
                 chunkNumber++;
                 String text = new String(buffer, 0, charsRead);
-                Message fileMessage = new Message(Status.FILE, storedClient.getRqNum(), fileName, chunkNumber, text);
-                // Serialize the message and send it
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-                objectOutputStream.writeObject(fileMessage);
-                objectOutputStream.flush();
-                byte[] sendMessage = byteArrayOutputStream.toByteArray();
-                outputStream.write(new String(sendMessage));
-                outputStream.flush();
+                System.out.println("sending chunks");
+                Message fileChunkMessage = new Message(Status.FILE, clientRqNum, fileName, chunkNumber, text);
+                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                out.writeObject(fileChunkMessage);
             }
 
-            // Send FILE_END
-            Message fileEndMessage = new Message(Status.FILE_END, storedClient.getRqNum(), fileName, chunkNumber, "");
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-            objectOutputStream.writeObject(fileEndMessage);
-            objectOutputStream.flush();
-            byte[] sendMessage = byteArrayOutputStream.toByteArray();
-            outputStream.write(new String(sendMessage));
-            outputStream.flush();
-
-            System.out.println("File transfer complete");
-
-            // Close streams and socket
-            fileReader.close();
-            outputStream.close();
-            socket.close();
+            Message fileEndMessage = new Message(Status.FILE_END, clientRqNum, fileName, chunkNumber, "");
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            out.writeObject(fileEndMessage);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+
+    //FILE handler
+    private static void handleFile(Message receivedMessage) {
+        System.out.println("Handling file chunks");
+        String fileName = receivedMessage.getFile();
+        int chunkNumber = receivedMessage.getChunkNum();
+        String text = receivedMessage.getText();
+
+        // Check if this is the first chunk of the file
+        if (chunkNumber == 1) {
+            // Create a new file with the given file name
+            try (FileWriter fileWriter = new FileWriter(fileName)) {
+                // Write the text of the first chunk to the file
+                fileWriter.write(text);
+                System.out.println("Received first chunk of file: " + fileName);
+            } catch (IOException e) {
+                System.out.println("Error creating or writing to file: " + e.getMessage());
+            }
+        } else {
+            // Append subsequent chunks to the existing file
+            try (FileWriter fileWriter = new FileWriter(fileName, true)) {
+                // Write the text of the chunk to the file
+                fileWriter.write(text);
+                System.out.println("Received chunk " + chunkNumber + " of file: " + fileName);
+            } catch (IOException e) {
+                System.out.println("Error appending to file: " + e.getMessage());
+            }
+        }
+
+    }
+
+    //FILE-END
+
+
+    //created method to send
+    private static void sendMessageToClient(Message message, InetAddress address, int port) throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+             ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream))
+        {
+
+                objectOutputStream.writeObject(message);
+                objectOutputStream.flush();
+
+                byte[] sendData = byteArrayOutputStream.toByteArray();
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, port);
+                clientSocket.send(sendPacket);
         }
     }
 

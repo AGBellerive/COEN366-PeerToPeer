@@ -40,6 +40,11 @@ public class Message implements Serializable {
     private InetAddress newIPAddress;
     private int newClientPort;
 
+    private int tcpSocketNum;
+
+    private InetAddress clientIPAddress;
+
+
 
     /**
      * For a new user to register, they must send a message
@@ -66,7 +71,24 @@ public class Message implements Serializable {
         this.rqNumber = rqNumber;
     }
 
+    public Message(Status action,int rqNumber, String file, ClientInfo clientInfo){
+        this.action = action;
+        this.rqNumber = rqNumber;
+        this.file = file;
+        this.clientInfo=clientInfo;
+    }
+
+
+
+
     public Message(Status status, int rqNum, ClientInfo storedClient, String currentFilePathToDelete) {
+    }
+
+    public Message(Status action, int rqNumber, int tcpSocketNum, InetAddress clientIPAddress) {
+        this.action=action;
+        this.rqNumber=rqNumber;
+        this.tcpSocketNum=tcpSocketNum;
+        this.clientIPAddress=clientIPAddress;
     }
 
 
@@ -163,5 +185,21 @@ public class Message implements Serializable {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public int getTcpSocketNum() {
+        return tcpSocketNum;
+    }
+
+    public void setTcpSocketNum(int tcpSocketNum) {
+        this.tcpSocketNum = tcpSocketNum;
+    }
+
+    public InetAddress getClientIPAddress() {
+        return clientIPAddress;
+    }
+
+    public void setClientIPAddress(InetAddress clientIPAddress) {
+        this.clientIPAddress = clientIPAddress;
     }
 }
