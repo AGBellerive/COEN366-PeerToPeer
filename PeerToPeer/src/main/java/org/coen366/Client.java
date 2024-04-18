@@ -605,29 +605,43 @@ public class Client {
     //FILE-END | RQ# | File-Name | Chunk# | Text
     //gets called at handleFileRequest
     private static void handleFileTransfer(String fileName, int tcpSocket, InetAddress peerAddress) {
-        try (ServerSocket serverSocket = new ServerSocket(tcpSocket);
+        try {
+            ServerSocket serverSocket = new ServerSocket(tcpSocket);
              Socket socket = serverSocket.accept(); //accept tcp
-             BufferedReader fileReader = new BufferedReader(new FileReader(fileName));
-             ) {
-            System.out.println("Client connected");
 
-            char[] buffer = new char[200];
-            int charsRead;
-            int chunkNumber = 0;
-            int clientRqNum = storedClient.getRqNum();
+            Thread thread = new Thread(() -> {
+                try {
+                    // Send an update message to all clients
+                    BufferedReader fileReader = new BufferedReader(new FileReader(fileName));
 
-            while ((charsRead = fileReader.read(buffer)) != -1) {
-                chunkNumber++;
-                String text = new String(buffer, 0, charsRead);
-                System.out.println("sending chunks");
-                Message fileChunkMessage = new Message(Status.FILE, clientRqNum, fileName, chunkNumber, text);
-                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                out.writeObject(fileChunkMessage);
-            }
+                    System.out.println("Client connected");
 
-            Message fileEndMessage = new Message(Status.FILE_END, clientRqNum, fileName, chunkNumber, "");
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-            out.writeObject(fileEndMessage);
+                    char[] buffer = new char[200];
+                    int charsRead;
+                    int chunkNumber = 0;
+                    int clientRqNum = storedClient.getRqNum();
+
+                    while ((charsRead = fileReader.read(buffer)) != -1) {
+                        chunkNumber++;
+                        String text = new String(buffer, 0, charsRead);
+                        System.out.println("sending chunks");
+                        Message fileChunkMessage = new Message(Status.FILE, clientRqNum, fileName, chunkNumber, text);
+                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                        out.writeObject(fileChunkMessage);
+                    }
+
+                    Message fileEndMessage = new Message(Status.FILE_END, clientRqNum, fileName, chunkNumber, "");
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                    out.writeObject(fileEndMessage);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            thread.start();
+
+
+
         } catch (IOException e) {
             e.printStackTrace();
         }
